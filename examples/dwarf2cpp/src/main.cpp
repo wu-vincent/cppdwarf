@@ -1,5 +1,6 @@
 #include <argparse/argparse.hpp>
 #include <cppdwarf/cppdwarf.hpp>
+#include <spdlog/spdlog.h>
 
 namespace dw = cppdwarf;
 
@@ -23,11 +24,11 @@ int main(int argc, char *argv[])
     for (const auto &cu : debug) {
         auto &die = cu.die();
         for (const auto &attribute : die.attributes()) {
-            printf("[%d] attribute: %s\n", i, attribute.name());
+            spdlog::info("[cu/{}] attribute: {}", i, attribute.name());
         }
         i++;
     }
-    printf("%d Compilation Units\n", i);
+    spdlog::info("{} Compilation Units", i);
 
     return 0;
 }
