@@ -1,4 +1,3 @@
-#ifndef CPPDWARF_HPP
-#define CPPDWARF_HPP
+#pragma once
 
-#endif //CPPDWARF_HPP
+#include <cppdwarf/details/debug.hpp>
