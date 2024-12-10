@@ -136,7 +136,7 @@ private:
                     return;
                 }
 
-                cu_ = std::make_unique<T>(cu_header_length, version_stamp, abbrev_offset, address_size);
+                cu_ = std::make_unique<T>(dbg_, cu_die, cu_header_length, version_stamp, abbrev_offset, address_size);
                 break;
             }
         }

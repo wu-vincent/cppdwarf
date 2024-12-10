@@ -1,13 +1,21 @@
 #pragma once
 
+#include <cppdwarf/details/die.hpp>
+
 namespace cppdwarf {
 
 class compilation_unit {
 public:
-    compilation_unit(std::size_t cu_header_length, int version_stamp, std::size_t abbrev_offset, int address_size)
-        : cu_header_length_(cu_header_length), version_stamp_(version_stamp), abbrev_offset_(abbrev_offset),
-          address_size_(address_size)
+    compilation_unit(Dwarf_Debug dbg, Dwarf_Die die, std::size_t cu_header_length, int version_stamp,
+                     std::size_t abbrev_offset, int address_size)
+        : die_(dbg, die), cu_header_length_(cu_header_length), version_stamp_(version_stamp),
+          abbrev_offset_(abbrev_offset), address_size_(address_size)
     {
+    }
+
+    [[nodiscard]] const die &die() const
+    {
+        return die_;
     }
 
     [[nodiscard]] std::size_t header_length() const
@@ -31,6 +39,7 @@ public:
     }
 
 private:
+    cppdwarf::die die_;
     std::size_t cu_header_length_;
     int version_stamp_;
     std::size_t abbrev_offset_;
