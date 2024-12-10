@@ -27,10 +27,8 @@ int main(int argc, char *argv[])
     int i = 0;
     for (const auto &cu : debug) {
         auto &die = cu.die();
-        spdlog::info("{}\n{}", i, die);
-        i++;
+        auto die_name = die.find(dw::attribute_t::name)->get<std::string>();
+        spdlog::info("[{:<4}] {}", ++i, die_name);
     }
-    spdlog::info("{} Compilation Units", i);
-
     return 0;
 }

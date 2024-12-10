@@ -51,9 +51,19 @@ public:
         return static_cast<cppdwarf::tag>(tag);
     }
 
-    [[nodiscard]] attribute_list &attributes() const
+    [[nodiscard]] const attribute_list &attributes() const
     {
         return *attributes_;
+    }
+
+    [[nodiscard]] attribute_list::const_iterator find(attribute_t type) const
+    {
+        return attributes().find(type);
+    }
+
+    [[nodiscard]] bool contains(attribute_t type) const
+    {
+        return find(type) != attributes().end();
     }
 
     friend std::ostream &operator<<(std::ostream &os, const die &d)
