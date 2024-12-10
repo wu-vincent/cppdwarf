@@ -1,0 +1,4 @@
+#ifndef CPPDWARF_HPP
+#define CPPDWARF_HPP
+
+#endif //CPPDWARF_HPP
