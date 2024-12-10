@@ -1,8 +1,12 @@
 #include <argparse/argparse.hpp>
 #include <cppdwarf/cppdwarf.hpp>
+#include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
 
 namespace dw = cppdwarf;
+
+template <>
+struct fmt::formatter<dw::die> : ostream_formatter {};
 
 int main(int argc, char *argv[])
 {
@@ -23,9 +27,7 @@ int main(int argc, char *argv[])
     int i = 0;
     for (const auto &cu : debug) {
         auto &die = cu.die();
-        for (const auto &attribute : die.attributes()) {
-            spdlog::info("[cu/{}] attribute: {}", i, attribute.name());
-        }
+        spdlog::info("{}\n{}", i, die);
         i++;
     }
     spdlog::info("{} Compilation Units", i);

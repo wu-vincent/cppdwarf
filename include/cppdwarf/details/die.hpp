@@ -2,6 +2,8 @@
 
 #include <libdwarf.h>
 
+#include <iomanip>
+
 #include <cppdwarf/details/attribute.hpp>
 #include <cppdwarf/details/attribute_list.hpp>
 #include <cppdwarf/details/tag.hpp>
@@ -52,6 +54,20 @@ public:
     [[nodiscard]] attribute_list &attributes() const
     {
         return *attributes_;
+    }
+
+    friend std::ostream &operator<<(std::ostream &os, const die &d)
+    {
+        os << "die: " << d.tag() << "\n";
+        const auto &attributes = d.attributes();
+        for (int i = 0; i < attributes.size(); i++) {
+            auto attr = attributes[i];
+            if (i > 0) {
+                os << "\n";
+            }
+            os << " [" << std::setw(2) << std::right << i << "] " << attr;
+        }
+        return os;
     }
 
 private:

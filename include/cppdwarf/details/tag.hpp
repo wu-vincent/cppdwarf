@@ -132,4 +132,17 @@ enum class tag {
     hi_user = DW_TAG_hi_user,
 };
 
+inline std::ostream &operator<<(std::ostream &os, tag tag)
+{
+    const char *name = nullptr;
+    int res = dwarf_get_TAG_name(static_cast<Dwarf_Half>(tag), &name);
+    if (res != DW_DLV_OK) {
+        os << "<bogus tag>";
+    }
+    else {
+        os << name;
+    }
+    return os;
+}
+
 } // namespace cppdwarf

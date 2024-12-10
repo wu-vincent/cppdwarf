@@ -337,4 +337,17 @@ enum class attribute_t {
     APPLE_origin = DW_AT_APPLE_origin,
     hi_user = DW_AT_hi_user,
 };
+
+inline std::ostream &operator<<(std::ostream &os, attribute_t at)
+{
+    const char *name = nullptr;
+    int res = dwarf_get_AT_name(static_cast<Dwarf_Half>(at), &name);
+    if (res != DW_DLV_OK) {
+        os << "<bogus attrnum>";
+    }
+    else {
+        os << name;
+    }
+    return os;
+}
 } // namespace cppdwarf

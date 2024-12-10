@@ -26,6 +26,24 @@ public:
         }
     }
 
+    attribute operator[](std::size_t index) const
+    {
+        return attribute(dbg_, attributes_[index]);
+    }
+
+    [[nodiscard]] attribute at(std::size_t index) const
+    {
+        if (index >= attr_count_) {
+            throw std::out_of_range("index is out of range");
+        }
+        return attribute(dbg_, attributes_[index]);
+    }
+
+    [[nodiscard]] std::size_t size() const
+    {
+        return attr_count_;
+    }
+
 private:
     template <typename T>
     class iterator_base {
