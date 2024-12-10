@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cppdwarf/details/attribute.hpp>
+
 namespace cppdwarf {
 
 class die {
