@@ -26,24 +26,6 @@ public:
         }
     }
 
-    attribute operator[](std::size_t index) const
-    {
-        return attribute(dbg_, attributes_[index]);
-    }
-
-    [[nodiscard]] attribute at(std::size_t index) const
-    {
-        if (index >= attr_count_) {
-            throw std::out_of_range("index is out of range");
-        }
-        return attribute(dbg_, attributes_[index]);
-    }
-
-    [[nodiscard]] std::size_t size() const
-    {
-        return attr_count_;
-    }
-
 private:
     template <typename T>
     class iterator_base {
@@ -112,6 +94,53 @@ public:
     [[nodiscard]] const_iterator end() const
     {
         return {dbg_, attributes_, attr_count_, attr_count_};
+    }
+
+    attribute operator[](std::size_t index) const
+    {
+        return attribute(dbg_, attributes_[index]);
+    }
+
+    [[nodiscard]] attribute at(std::size_t index) const
+    {
+        if (index >= attr_count_) {
+            throw out_of_range("index is out of range");
+        }
+        return attribute(dbg_, attributes_[index]);
+    }
+
+    [[nodiscard]] attribute at(attribute_t type) const
+    {
+        const auto it = find(type);
+        if (it == end()) {
+            throw out_of_range("attribute not found");
+        }
+        return *it;
+    }
+
+    [[nodiscard]] const_iterator find(attribute_t type) const
+    {
+        for (auto it = begin(); it != end(); ++it) {
+            if ((*it).type() == type) {
+                return it;
+            }
+        }
+        return end();
+    }
+
+    [[nodiscard]] bool contains(attribute_t type) const
+    {
+        return find(type) != end();
+    }
+
+    [[nodiscard]] std::size_t size() const
+    {
+        return attr_count_;
+    }
+
+    [[nodiscard]] bool empty() const
+    {
+        return attr_count_ == 0;
     }
 
 private:
