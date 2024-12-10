@@ -85,6 +85,22 @@ public:
         return false;
     }
 
+    [[nodiscard]] bool is_integer() const noexcept
+    {
+        switch (form()) {
+        case form::data1:
+        case form::data2:
+        case form::data4:
+        case form::data8:
+        case form::sdata:
+        case form::udata:
+            return true;
+        default:
+            break;
+        }
+        return false;
+    }
+
     template <typename T>
     T get() const
     {
@@ -95,6 +111,31 @@ public:
 private:
     Dwarf_Debug dbg_ = nullptr;
     Dwarf_Attribute attr_;
+
+    [[nodiscard]] std::int64_t get_integer() const
+    {
+        if (!is_integer()) {
+            throw type_error("not an integer");
+        }
+        if (form() == form::sdata) {
+            Dwarf_Signed value = 0;
+            Dwarf_Error error = nullptr;
+            int res = dwarf_formsdata(attr_, &value, &error);
+            if (res != DW_DLV_OK) {
+                throw type_error("dwarf_formsdata failed!");
+            }
+            return value;
+        }
+        else {
+            Dwarf_Unsigned value = 0;
+            Dwarf_Error error = nullptr;
+            int res = dwarf_formudata(attr_, &value, &error);
+            if (res != DW_DLV_OK) {
+                throw type_error("dwarf_formudata failed!");
+            }
+            return static_cast<std::int64_t>(value);
+        }
+    }
 };
 
 template <>
@@ -106,6 +147,12 @@ template <>
         throw type_error("dwarf_formstring failed!");
     }
     return value;
+}
+
+template <>
+[[nodiscard]] inline int attribute::get<int>() const
+{
+    return static_cast<int>(get_integer());
 }
 
 inline std::ostream &operator<<(std::ostream &os, const attribute &attr)

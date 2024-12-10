@@ -131,7 +131,7 @@ public:
     [[nodiscard]] const_iterator find(attribute_t type) const
     {
         for (auto it = begin(); it != end(); ++it) {
-            if ((*it).type() == type) {
+            if (it->type() == type) {
                 return it;
             }
         }

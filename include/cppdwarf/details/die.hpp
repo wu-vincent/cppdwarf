@@ -170,6 +170,26 @@ public:
         return find(type) != attributes().end();
     }
 
+    [[nodiscard]] std::vector<std::string> src_files() const
+    {
+        char **srcfiles = nullptr;
+        Dwarf_Signed count = 0;
+        Dwarf_Error error = nullptr;
+        int res = dwarf_srcfiles(die_, &srcfiles, &count, &error);
+        if (res != DW_DLV_OK) {
+            throw other_error("dwarf_srcfiles failed!");
+        }
+
+        std::vector<std::string> result;
+        for (int i = 0; i < count; ++i) {
+            result.emplace_back(srcfiles[i]);
+            dwarf_dealloc(dbg_, srcfiles[i], DW_DLA_STRING);
+            srcfiles[i] = nullptr;
+        }
+        dwarf_dealloc(dbg_, srcfiles, DW_DLA_LIST);
+        return result;
+    }
+
     friend std::ostream &operator<<(std::ostream &os, const die &d)
     {
         os << "die: " << d.tag() << "\n";
