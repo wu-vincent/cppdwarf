@@ -6,12 +6,12 @@ namespace cppdwarf {
 
 class attribute {
 public:
-    explicit attribute(Dwarf_Debug dbg, Dwarf_Attribute attr) : dbg_(dbg), attr_(attr, dwarf_dealloc_attribute) {}
+    explicit attribute(Dwarf_Debug dbg, Dwarf_Attribute attr) : dbg_(dbg), attr_(attr) {}
 
     attribute(const attribute &) = delete;
     attribute &operator=(const attribute &) = delete;
 
-    attribute(attribute &&other) noexcept : dbg_(other.dbg_), attr_(std::move(other.attr_))
+    attribute(attribute &&other) noexcept : dbg_(other.dbg_), attr_(other.attr_)
     {
         other.attr_ = nullptr;
     }
@@ -20,7 +20,7 @@ public:
     {
         if (this != &other) {
             dbg_ = other.dbg_;
-            attr_ = std::move(other.attr_);
+            attr_ = other.attr_;
             other.attr_ = nullptr;
         }
         return *this;
@@ -33,7 +33,7 @@ public:
         int res = 0;
         Dwarf_Error error = nullptr;
         Dwarf_Half attrnum = 0;
-        res = dwarf_whatattr(attr_.get(), &attrnum, &error);
+        res = dwarf_whatattr(attr_, &attrnum, &error);
         if (res != DW_DLV_OK) {
             throw other_error("dwarf_whatattr failed!");
         }
@@ -55,7 +55,7 @@ public:
 
 private:
     Dwarf_Debug dbg_ = nullptr;
-    std::unique_ptr<Dwarf_Attribute_s, decltype(&dwarf_dealloc_attribute)> attr_;
+    Dwarf_Attribute attr_;
 };
 
 template <>
@@ -63,7 +63,7 @@ template <>
 {
     char *value = nullptr;
     Dwarf_Error error = nullptr;
-    if (dwarf_formstring(attr_.get(), &value, &error) != DW_DLV_OK) {
+    if (dwarf_formstring(attr_, &value, &error) != DW_DLV_OK) {
         throw type_error("dwarf_formstring failed!");
     }
     return value;

@@ -22,6 +22,9 @@ int main(int argc, char *argv[])
     int i = 0;
     for (const auto &cu : debug) {
         auto &die = cu.die();
+        for (const auto &attribute : die.attributes()) {
+            printf("[%d] attribute: %s\n", i, attribute.name());
+        }
         i++;
     }
     printf("%d Compilation Units\n", i);

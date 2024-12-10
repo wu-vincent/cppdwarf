@@ -38,6 +38,12 @@ public:
     explicit type_error(const char *message) : exception(message) {}
 };
 
+class out_of_range : public exception {
+public:
+    explicit out_of_range(const std::string &message) : exception(message) {}
+    explicit out_of_range(const char *message) : exception(message) {}
+};
+
 class other_error : public exception {
 public:
     explicit other_error(const std::string &message) : exception(message) {}
