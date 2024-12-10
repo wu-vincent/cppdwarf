@@ -19,5 +19,11 @@ int main(int argc, char *argv[])
     auto path = parser.get<std::string>("path");
     auto debug = dw::debug(path);
 
+    int i = 0;
+    for (const auto &cu : debug) {
+        i++;
+    }
+    printf("%d Compilation Units\n", i);
+
     return 0;
 }

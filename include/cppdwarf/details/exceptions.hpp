@@ -26,4 +26,10 @@ public:
     explicit init_error(const char *message) : exception(message) {}
 };
 
+class invalid_iterator : public exception {
+public:
+    explicit invalid_iterator(const std::string &message) : exception(message) {}
+    explicit invalid_iterator(const char *message) : exception(message) {}
+};
+
 } // namespace cppdwarf
