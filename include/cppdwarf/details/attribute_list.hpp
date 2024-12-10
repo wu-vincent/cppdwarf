@@ -9,7 +9,8 @@ public:
     attribute_list(Dwarf_Debug dbg, Dwarf_Die die) : dbg_(dbg), die_(die)
     {
         Dwarf_Error error = nullptr;
-        if (dwarf_attrlist(die, &attributes_, &attr_count_, &error) != DW_DLV_OK) {
+        int res = dwarf_attrlist(die, &attributes_, &attr_count_, &error);
+        if (res != DW_DLV_OK) {
             attributes_ = nullptr;
             attr_count_ = 0;
         }
@@ -37,7 +38,8 @@ private:
         using reference = T &;
 
         iterator_base(Dwarf_Debug dbg, Dwarf_Attribute *attributes, Dwarf_Signed index, Dwarf_Signed count)
-            : dbg_(dbg), attributes_(attributes), index_(index), count_(count), value_(dbg_, attributes_[index_])
+            : dbg_(dbg), attributes_(attributes), index_(index), count_(count),
+              value_(dbg_, attributes ? attributes[index_] : nullptr)
         {
         }
 
