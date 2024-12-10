@@ -73,4 +73,66 @@ inline std::string commonpath(const std::vector<std::string> &paths)
     return join(common);
 }
 
+// Normalize path by removing redundant ".." and "." components
+std::string normpath(const std::string &path)
+{
+    std::vector<std::string> components = split(path);
+    std::vector<std::string> normalized;
+
+    for (const auto &component : components) {
+        if (component == "..") {
+            if (!normalized.empty() && normalized.back() != "..") {
+                normalized.pop_back(); // Go up one directory
+            }
+            else {
+                normalized.push_back(component); // Keep ".." if no parent to go up to
+            }
+        }
+        else if (component != ".") {
+            normalized.push_back(component);
+        }
+    }
+
+    return join(normalized);
+}
+
+// Compute the relative path
+std::string relpath(const std::string &path, const std::string &start = "/")
+{
+    // Normalize the paths
+    std::string norm_path = normpath(path);
+    std::string norm_start = normpath(start);
+
+    // Split the normalized paths into components
+    std::vector<std::string> path_components = split(norm_path);
+    std::vector<std::string> start_components = split(norm_start);
+
+    // Find the common prefix
+    size_t common_length = 0;
+    for (size_t i = 0; i < std::min(path_components.size(), start_components.size()); ++i) {
+        if (path_components[i] == start_components[i]) {
+            ++common_length;
+        }
+        else {
+            break;
+        }
+    }
+
+    // Compute the relative path
+    std::vector<std::string> relative_components;
+
+    // Add ".." for each remaining component in the start path
+    for (size_t i = common_length; i < start_components.size(); ++i) {
+        relative_components.emplace_back("..");
+    }
+
+    // Add the remaining components of the target path
+    for (size_t i = common_length; i < path_components.size(); ++i) {
+        relative_components.push_back(path_components[i]);
+    }
+
+    // Join the components into the final relative path
+    return relative_components.empty() ? "." : join(relative_components);
+}
+
 } // namespace posixpath
