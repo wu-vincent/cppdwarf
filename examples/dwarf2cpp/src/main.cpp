@@ -1,53 +1,21 @@
+#include <filesystem>
 #include <unordered_set>
 
 #include <argparse/argparse.hpp>
 #include <cppdwarf/cppdwarf.hpp>
-#include <spdlog/fmt/ostr.h>
+#include <spdlog/fmt/std.h>
 #include <spdlog/spdlog.h>
 
+#include "parser.hpp"
 #include "posixpath.hpp"
 
 namespace dw = cppdwarf;
+namespace fs = std::filesystem;
 
 template <>
 struct fmt::formatter<dw::die> : ostream_formatter {};
 
 using file_entry_storage = std::unordered_map<std::string, std::unordered_set<std::string>>;
-
-void parse_children(const dw::die &die, file_entry_storage &storage, const std::vector<std::string> &src_files)
-{
-    for (const auto &child : die) {
-        switch (child.tag()) {
-        case dw::tag::namespace_: {
-            parse_children(child, storage, src_files);
-            break;
-        }
-        case dw::tag::class_type:
-        case dw::tag::enumeration_type:
-        case dw::tag::structure_type:
-        case dw::tag::union_type:
-        case dw::tag::subprogram: {
-            auto it = child.attributes().find(dw::attribute_t::decl_file);
-            if (it == child.attributes().end()) {
-                break;
-            }
-            const auto &decl_file = src_files.at(it->get<int>());
-
-            it = child.attributes().find(dw::attribute_t::name);
-            if (it == child.attributes().end()) {
-                break;
-            }
-            auto name = it->get<std::string>();
-
-            storage[decl_file].emplace(name);
-            spdlog::warn("{} {}", decl_file, name);
-            break;
-        }
-        default:
-            break;
-        }
-    }
-}
 
 int main(int argc, char *argv[])
 {
@@ -64,28 +32,22 @@ int main(int argc, char *argv[])
 
     auto path = parser.get<std::string>("path");
     auto debug = dw::debug(path);
-
-    int i = 0;
-    file_entry_storage storage;
-    std::string source_dir;
-    for (const auto &cu : debug) {
-        auto &cu_die = cu.die();
-        auto die_name = cu_die.find(dw::attribute_t::name)->get<std::string>();
-        auto comp_dir = cu_die.find(dw::attribute_t::comp_dir)->get<std::string>();
-        spdlog::info("[{:<4}] {}", ++i, die_name);
-
-        if (source_dir.empty()) {
-            source_dir = die_name;
+    auto dbg_parser = debug_parser(debug);
+    dbg_parser.parse();
+    auto base_dir = dbg_parser.base_dir();
+    for (const auto &[filename, entry] : dbg_parser.result()) {
+        if (posixpath::commonpath({filename, base_dir}) != base_dir) {
+            continue;
         }
-        source_dir = posixpath::commonpath({die_name, comp_dir, source_dir});
+        auto relpath = posixpath::relpath(filename, base_dir);
 
-        auto src_files = cu_die.src_files();
-        parse_children(cu_die, storage, src_files);
-    }
+        fs::path output_file = fs::path("output") / relpath;
+        create_directories(output_file.parent_path());
 
-    for (const auto &[filepath, content] : storage) {
-        if (posixpath::commonpath({filepath, source_dir}) != source_dir) {
-            spdlog::warn("skipping {}", filepath);
+        spdlog::info("writing to {}", output_file);
+        std::ofstream out(output_file.string());
+        for (const auto &[line, content] : entry) {
+            out << content << " // L" << line << "\n";
         }
     }
     return 0;

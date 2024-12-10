@@ -50,6 +50,17 @@ public:
         }
     }
 
+    [[nodiscard]] std::size_t offset() const
+    {
+        Dwarf_Off offset = 0;
+        Dwarf_Error error = nullptr;
+        int res = dwarf_dieoffset(die_, &offset, &error);
+        if (res != DW_DLV_OK) {
+            throw other_error("dwarf_dieoffset failed!");
+        }
+        return offset;
+    }
+
 private:
     template <typename T>
     class iterator_base {
@@ -209,5 +220,24 @@ private:
     Dwarf_Die die_;
     std::unique_ptr<attribute_list> attributes_;
 };
+
+template <>
+inline std::unique_ptr<die> attribute::get<std::unique_ptr<die>>() const
+{
+    Dwarf_Off offset = 0;
+    Dwarf_Bool is_info = 0;
+    Dwarf_Error error = nullptr;
+    int res = dwarf_global_formref_b(attr_, &offset, &is_info, &error);
+    if (res != DW_DLV_OK) {
+        throw other_error("dwarf_global_formref failed!");
+    }
+
+    Dwarf_Die die;
+    res = dwarf_offdie_b(dbg_, offset, is_info, &die, &error);
+    if (res != DW_DLV_OK) {
+        throw other_error("dwarf_offdie_b failed!");
+    }
+    return std::make_unique<cppdwarf::die>(dbg_, die);
+}
 
 } // namespace cppdwarf
