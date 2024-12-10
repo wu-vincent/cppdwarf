@@ -28,6 +28,7 @@ add_library(llvm-demangle::llvm-demangle ALIAS llvm-demangle)
 target_include_directories(llvm-demangle PUBLIC third_party/llvm/include)
 
 add_executable(dwarf2cpp src/main.cpp)
+target_include_directories(dwarf2cpp PRIVATE include)
 target_link_libraries(dwarf2cpp PRIVATE cppdwarf::cppdwarf
         argparse::argparse
         spdlog::spdlog)
