@@ -1,5 +1,8 @@
 #pragma once
 
+#include <libdwarf.h>
+
+#include <cppdwarf/details/attribute_t.hpp>
 #include <cppdwarf/details/exceptions.hpp>
 
 namespace cppdwarf {

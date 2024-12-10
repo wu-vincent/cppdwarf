@@ -1,7 +1,10 @@
 #pragma once
 
+#include <libdwarf.h>
+
 #include <cppdwarf/details/attribute.hpp>
 #include <cppdwarf/details/attribute_list.hpp>
+#include <cppdwarf/details/tag.hpp>
 
 namespace cppdwarf {
 
@@ -34,6 +37,17 @@ public:
     }
 
     ~die() = default;
+
+    [[nodiscard]] tag tag() const
+    {
+        Dwarf_Half tag;
+        Dwarf_Error error = nullptr;
+        int res = dwarf_tag(die_.get(), &tag, &error);
+        if (res == DW_DLV_ERROR) {
+            throw other_error("dwarf_tag failed!");
+        }
+        return static_cast<cppdwarf::tag>(tag);
+    }
 
     [[nodiscard]] attribute_list &attributes() const
     {
