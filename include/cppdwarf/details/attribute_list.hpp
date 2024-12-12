@@ -32,21 +32,19 @@ private:
     class iterator_base {
     public:
         using iterator_category = std::forward_iterator_tag;
-        using value_type = std::remove_const_t<T>;
+        using value_type = T;
         using difference_type = std::ptrdiff_t;
         using pointer = T *;
         using reference = T &;
 
         iterator_base(Dwarf_Debug dbg, Dwarf_Attribute *attributes, Dwarf_Signed index, Dwarf_Signed count)
-            : dbg_(dbg), attributes_(attributes), index_(index), count_(count),
-              value_(dbg_, attributes ? attributes[index_] : nullptr)
+            : dbg_(dbg), attributes_(attributes), index_(index), count_(count)
         {
         }
 
         iterator_base &operator++()
         {
             ++index_;
-            value_ = value_type(dbg_, attributes_[index_]);
             return *this;
         }
 
@@ -65,15 +63,15 @@ private:
             if (index_ >= count_) {
                 throw out_of_range("index is out of range");
             }
-            return value_;
+            return value_type(dbg_, attributes_[index_]);
         }
 
-        pointer operator->() const
+        std::unique_ptr<value_type> operator->() const
         {
             if (index_ >= count_) {
                 throw out_of_range("index is out of range");
             }
-            return &value_;
+            return std::make_unique<value_type>(dbg_, attributes_[index_]);
         }
 
     private:
@@ -81,7 +79,6 @@ private:
         Dwarf_Attribute *attributes_ = nullptr;
         Dwarf_Signed index_ = 0;
         Dwarf_Signed count_ = 0;
-        value_type value_;
     };
 
 public:
