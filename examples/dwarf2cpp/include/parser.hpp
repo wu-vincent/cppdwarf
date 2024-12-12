@@ -23,7 +23,11 @@ public:
     void parse()
     {
         namespace_list namespaces;
-        parse_top_level(cu_.die(), namespaces);
+        parse_children(cu_.die(), namespaces);
+
+        for (const auto &[offset, type] : type_info_) {
+            spdlog::info("{} {}", offset, type);
+        }
     }
 
     [[nodiscard]] std::unordered_map<std::string, std::map<int, std::string>> result() const
@@ -42,12 +46,14 @@ public:
     }
 
 private:
-    void parse_top_level(const dw::die &die, namespace_list &namespaces) // NOLINT(*-no-recursion)
+    void parse_children(const dw::die &die, namespace_list &namespaces) // NOLINT(*-no-recursion)
     {
         for (const auto &child : die) {
             const auto tag = child.tag();
             switch (tag) {
             case dw::tag::namespace_:
+                // A namespace can contain declarations from multiple files - we don't want this
+                // To solve this, we go inside the namespaces and start there again as the top level
                 parse_namespace(child, namespaces);
                 break;
             case dw::tag::base_type:
@@ -57,6 +63,11 @@ private:
             case dw::tag::structure_type:
             case dw::tag::union_type:
             case dw::tag::enumeration_type:
+            case dw::tag::array_type:
+            case dw::tag::pointer_type:
+            case dw::tag::const_type:
+            case dw::tag::rvalue_reference_type:
+            case dw::tag::reference_type:
                 parse_type(child, namespaces);
                 break;
             case dw::tag::subprogram:
@@ -75,15 +86,21 @@ private:
             name = it->get<std::string>();
         }
         namespaces.push_back(name);
-        parse_top_level(die, namespaces);
+        parse_children(die, namespaces);
         namespaces.pop_back();
     }
 
+    // parse a non-member type, for member types, see parse_member_type
     void parse_type(const dw::die &die, const namespace_list &namespaces)
     {
+        if (type_info_.find(die.offset()) != type_info_.end()) {
+            // we've already fully parsed the type
+            return;
+        }
         std::string name;
         std::string decl_file;
         int decl_line = 0;
+        std::unique_ptr<dw::die> type;
         if (auto it = die.find(dw::attribute_t::name); it != die.attributes().end()) {
             name = it->get<std::string>();
         }
@@ -93,23 +110,78 @@ private:
         if (auto it = die.find(dw::attribute_t::decl_line); it != die.attributes().end()) {
             decl_line = it->get<int>();
         }
+        if (auto it = die.find(dw::attribute_t::type); it != die.attributes().end()) {
+            type = it->get<std::unique_ptr<dw::die>>();
+        }
 
-        std::string qualified_name = name;
-        for (auto it = namespaces.rbegin(); it != namespaces.rend(); ++it) {
-            if (!it->empty()) {
-                qualified_name = *it + "::" + qualified_name;
+        if (!name.empty()) { // we already know the name, no need to resolve the type chain
+            type_info_.emplace(die.offset(), get_qualified_name(namespaces, name));
+        }
+        else if (die.tag() == dw::tag::base_type) {
+            // base_type without a name implies void
+            type_info_.emplace(die.offset(), "void");
+        }
+        else if (type != nullptr) {
+            // we don't have a name and we are not a base_type (i.e. not 'void'), but we have a ref to type.
+            // solve the type chain iteratively.
+            parse_type(*type, namespaces);
+            // at this point we should know everything about the underlying type
+            auto type_name = type_info_.at(type->offset());
+            switch (die.tag()) {
+            case dw::tag::const_type:
+                type_name += " const";
+                break;
+            case dw::tag::pointer_type:
+                type_name += "*";
+                break;
+            case dw::tag::array_type:
+                type_name += "[]";
+                break;
+            case dw::tag::reference_type:
+                type_name += "&";
+                break;
+            case dw::tag::rvalue_reference_type:
+                type_name += "&&";
+                break;
+            case dw::tag::volatile_type:
+                type_name = "volatile " + type_name;
+                break;
+            default:
+                break;
             }
+            type_info_.emplace(die.offset(), type_name);
+        }
+        else {
+            // no name, no type
+            std::stringstream ss;
+            ss << '<' << die.tag() << '>';
+            std::string type_name = ss.str();
+            switch (die.tag()) {
+            case dw::tag::const_type:
+                type_name = "void const";
+                break;
+            case dw::tag::pointer_type:
+                type_name = "void *";
+                break;
+            case dw::tag::reference_type:
+                type_name = "void &";
+                break;
+            default:
+                break;
+            }
+            type_info_.emplace(die.offset(), type_name);
         }
 
-        auto offset = die.offset();
-        type_info_[offset] = qualified_name;
-
-        if (!name.empty() && !decl_file.empty() && decl_line > 0) {
-            // TODO: Handle class/struct/union/enum parsing here
-            result_[decl_file][decl_line] = qualified_name;
+        if (name.empty() || decl_file.empty() || decl_line <= 0) {
+            return;
         }
+
+        result_[decl_file][decl_line] = get_qualified_name(namespaces, name);
+
+        // TODO: parse types such as typedef, struct, class, union, enum here
     }
 
+    // parse a non-member function, for member functions, see parse_member_function
     void parse_function(const dw::die &die, const namespace_list &namespaces)
     {
         std::string name;
@@ -126,16 +198,31 @@ private:
             decl_line = it->get<int>();
         }
 
-        if (!name.empty() && !decl_file.empty() && decl_line > 0) {
-            // TODO: Handle subprogram parsing here
-            std::string qualified_name = name;
-            for (auto it = namespaces.rbegin(); it != namespaces.rend(); ++it) {
-                if (!it->empty()) {
-                    qualified_name = *it + "::" + qualified_name;
-                }
-            }
-            result_[decl_file][decl_line] = qualified_name;
+        if (name.empty() || decl_file.empty() || decl_line <= 0) {
+            return;
         }
+
+        result_[decl_file][decl_line] = get_qualified_name(namespaces, name);
+        // TODO: parse non-member function here
+    }
+
+    static std::string get_qualified_name(const namespace_list &namespaces, const std::string &name)
+    {
+        std::string qualified_name;
+        for (const auto &ns : namespaces) {
+            if (ns.empty()) {
+                continue;
+            }
+            if (!qualified_name.empty()) {
+                qualified_name += "::";
+            }
+            qualified_name += ns;
+        }
+        if (!qualified_name.empty()) {
+            qualified_name += "::";
+        }
+        qualified_name += name;
+        return qualified_name;
     }
 
     dw::compilation_unit &cu_;
@@ -165,6 +252,7 @@ public:
             for (const auto &[filename, entry] : parser.result()) {
                 result_[filename].insert(entry.begin(), entry.end());
             }
+            break;
         }
     }
 
