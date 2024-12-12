@@ -134,9 +134,24 @@ private:
             case dw::tag::pointer_type:
                 type_name += "*";
                 break;
-            case dw::tag::array_type:
-                type_name += "[]";
+            case dw::tag::array_type: {
+                int array_size = 0;
+                for (const auto &child : die) {
+                    if (child.tag() != dw::tag::subrange_type) {
+                        continue;
+                    }
+                    if (auto it = child.find(dw::attribute_t::count); it != child.attributes().end()) {
+                        array_size += it->get<int>();
+                        break;
+                    }
+                    if (auto it = child.find(dw::attribute_t::upper_bound); it != child.attributes().end()) {
+                        array_size += it->get<int>() + 1;
+                        break;
+                    }
+                }
+                type_name += "[" + std::to_string(array_size) + "]";
                 break;
+            }
             case dw::tag::reference_type:
                 type_name += "&";
                 break;
