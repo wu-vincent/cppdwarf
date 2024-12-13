@@ -58,7 +58,7 @@ private:
             return !(*this == other);
         }
 
-        reference operator*() const
+        value_type operator*() const
         {
             if (index_ >= count_) {
                 throw out_of_range("index is out of range");
@@ -118,7 +118,7 @@ public:
         return attribute(dbg_, attributes_[index]);
     }
 
-    [[nodiscard]] const_iterator::reference at(attribute_t type) const
+    [[nodiscard]] attribute at(attribute_t type) const
     {
         const auto it = find(type);
         if (it == end()) {

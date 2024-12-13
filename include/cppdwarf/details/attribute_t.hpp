@@ -2,6 +2,8 @@
 
 #include <dwarf.h>
 
+#include <ostream>
+
 namespace cppdwarf {
 enum class attribute_t {
     sibling = DW_AT_sibling,

@@ -3,6 +3,7 @@
 #include <libdwarf.h>
 
 #include <iomanip>
+#include <vector>
 
 #include <cppdwarf/details/attribute.hpp>
 #include <cppdwarf/details/attribute_list.hpp>
@@ -238,6 +239,25 @@ inline std::unique_ptr<die> attribute::get<std::unique_ptr<die>>() const
         throw other_error("dwarf_offdie_b failed!");
     }
     return std::make_unique<cppdwarf::die>(dbg_, die);
+}
+
+template <>
+inline die attribute::get<die>() const
+{
+    Dwarf_Off offset = 0;
+    Dwarf_Bool is_info = 0;
+    Dwarf_Error error = nullptr;
+    int res = dwarf_global_formref_b(attr_, &offset, &is_info, &error);
+    if (res != DW_DLV_OK) {
+        throw other_error("dwarf_global_formref failed!");
+    }
+
+    Dwarf_Die die;
+    res = dwarf_offdie_b(dbg_, offset, is_info, &die, &error);
+    if (res != DW_DLV_OK) {
+        throw other_error("dwarf_offdie_b failed!");
+    }
+    return cppdwarf::die(dbg_, die);
 }
 
 } // namespace cppdwarf

@@ -74,7 +74,7 @@ inline std::string commonpath(const std::vector<std::string> &paths)
 }
 
 // Normalize path by removing redundant ".." and "." components
-std::string normpath(const std::string &path)
+inline std::string normpath(const std::string &path)
 {
     std::vector<std::string> components = split(path);
     std::vector<std::string> normalized;
@@ -97,7 +97,7 @@ std::string normpath(const std::string &path)
 }
 
 // Compute the relative path
-std::string relpath(const std::string &path, const std::string &start = "/")
+inline std::string relpath(const std::string &path, const std::string &start = "/")
 {
     // Normalize the paths
     std::string norm_path = normpath(path);

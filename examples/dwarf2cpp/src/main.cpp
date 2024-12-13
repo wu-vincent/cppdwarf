@@ -6,8 +6,8 @@
 #include <spdlog/fmt/std.h>
 #include <spdlog/spdlog.h>
 
-#include "parser.hpp"
-#include "posixpath.hpp"
+#include "dwarf2cpp/parser.h"
+#include "dwarf2cpp/posixpath.hpp"
 
 namespace dw = cppdwarf;
 namespace fs = std::filesystem;
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     auto dbg_parser = debug_parser(debug);
     dbg_parser.parse();
     auto base_dir = dbg_parser.base_dir();
-    for (const auto &[filename, entry] : dbg_parser.result()) {
+    for (const auto &[filename, content] : dbg_parser.result()) {
         if (posixpath::commonpath({filename, base_dir}) != base_dir) {
             continue;
         }
@@ -46,9 +46,7 @@ int main(int argc, char *argv[])
 
         spdlog::info("writing to {}", output_file);
         std::ofstream out(output_file.string());
-        for (const auto &[line, content] : entry) {
-            out << content << " // L" << line << "\n";
-        }
+        out << content;
     }
     return 0;
 }
