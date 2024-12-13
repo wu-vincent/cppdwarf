@@ -37,7 +37,7 @@ public:
 
 private:
     std::string name_;
-    std::string type_{"<bad type>"};
+    std::string type_{"<check>"};
 };
 
 class function_t : public entry {
@@ -54,6 +54,17 @@ private:
     bool is_const_{false};
 };
 
+class field_t : public entry {
+public:
+    using entry::entry;
+    void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] std::string to_source() const override;
+
+private:
+    std::string name_;
+    std::string type_{"<check>"};
+};
+
 class typedef_t : public entry {
 public:
     using entry::entry;
@@ -62,7 +73,7 @@ public:
 
 private:
     std::string name_;
-    std::string type_{"<bad typedef>"};
+    std::string type_{"<check>"};
 };
 
 class enum_t : public entry {

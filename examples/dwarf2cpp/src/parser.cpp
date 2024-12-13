@@ -4,6 +4,7 @@
 
 void debug_parser::parse()
 {
+    int i = 0;
     for (auto &cu : dbg_) {
         cu_parser parser(cu, *this);
         spdlog::info("parsing {}", parser.name());
@@ -13,7 +14,11 @@ void debug_parser::parse()
             base_dir_ = cu_base_dir;
         }
         base_dir_ = posixpath::commonpath({cu_base_dir, base_dir_});
-        break;
+        i++;
+
+        if (i >= 2) {
+            break;
+        }
     }
 }
 
