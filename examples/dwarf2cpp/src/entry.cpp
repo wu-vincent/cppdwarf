@@ -42,6 +42,9 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
         const auto return_type = it->get<dw::die>();
         return_type_ = parser.get_type(it->get<dw::die>());
     }
+    if (const auto it = die.attributes().find(dw::attribute_t::virtuality); it != die.attributes().end()) {
+        virtuality_ = static_cast<dw::virtuality>(it->get<int>());
+    }
 
     int param_index = 0;
     for (const auto &child : die) {
@@ -75,6 +78,9 @@ std::string function_t::to_source() const
             ss << "static ";
         }
     }
+    if (virtuality_ > dw::virtuality::none) {
+        ss << "virtual ";
+    }
     ss << return_type_ << " " << name_;
     ss << "(";
     for (; it != parameters_.end(); ++it) {
@@ -86,6 +92,9 @@ std::string function_t::to_source() const
     ss << ")";
     if (is_const_) {
         ss << " const";
+    }
+    if (virtuality_ == dw::virtuality::pure_virtual) {
+        ss << " = 0";
     }
     ss << ";";
     return ss.str();
@@ -99,12 +108,20 @@ void field_t::parse(const dw::die &die, cu_parser &parser)
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         type_ = parser.get_type(it->get<dw::die>());
     }
+    if (const auto it = die.attributes().find(dw::attribute_t::data_member_location); it != die.attributes().end()) {
+        member_location_ = it->get<std::size_t>();
+    }
     // TODO: handle anonymous struct here
 }
 
 std::string field_t::to_source() const
 {
-    return type_ + " " + name_ + ";";
+    std::stringstream ss;
+    ss << type_ << " " << name_ << ";";
+    if (member_location_.has_value()) {
+        ss << " // +" << member_location_.value();
+    }
+    return ss.str();
 }
 
 void typedef_t::parse(const dw::die &die, cu_parser &parser)
@@ -164,9 +181,8 @@ void struct_t::parse(const dw::die &die, cu_parser &parser)
         name_ = it->get<std::string>();
     }
 
-    auto ns = namespaces();
-    if (!name_.empty()) {
-        ns.push_back(name_);
+    if (const auto it = die.attributes().find(dw::attribute_t::byte_size); it != die.attributes().end()) {
+        byte_size = it->get<std::size_t>();
     }
 
     for (const auto &child : die) {
@@ -230,6 +246,9 @@ std::string struct_t::to_source() const
         }
     }
     ss << "};\n";
+    if (byte_size.has_value()) {
+        ss << "static_assert(sizeof(" << name_ << ") == " << byte_size.value() << ");\n";
+    }
     return ss.str();
 }
 

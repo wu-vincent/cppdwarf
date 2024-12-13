@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 
@@ -62,6 +63,7 @@ private:
     std::vector<std::unique_ptr<parameter_t>> parameters_;
     bool is_const_{false};
     bool is_member_{false};
+    dw::virtuality virtuality_{dw::virtuality::none};
 };
 
 class field_t : public entry {
@@ -73,6 +75,7 @@ public:
 private:
     std::string name_;
     std::string type_{"<check>"};
+    std::optional<std::size_t> member_location_;
 };
 
 class typedef_t : public entry {
@@ -114,6 +117,7 @@ private:
     std::string name_;
     bool is_class_;
     std::map<std::size_t, std::unique_ptr<entry>> members_;
+    std::optional<std::size_t> byte_size;
 };
 
 class union_t : public entry {

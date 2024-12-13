@@ -38,7 +38,7 @@ std::string source_file::to_source() const
 
         // Print the line and entry's source code
         ss << "// Line " << line << "\n";
-        ss << entry->to_source() << "\n\n";
+        ss << entry->to_source() << "\n";
     }
 
     // Close any remaining open namespaces
