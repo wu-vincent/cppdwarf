@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <unordered_map>
 #include <utility>
 
@@ -78,4 +79,28 @@ private:
     std::string name_;
     std::string base_type_;
     std::vector<enumerator_t> enumerators_;
+};
+
+class struct_t : public entry {
+public:
+    explicit struct_t(bool is_class, namespace_list namespaces = {})
+        : entry(std::move(namespaces)), is_class_(is_class){};
+    void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] std::string to_source() const override;
+
+private:
+    std::string name_;
+    bool is_class_;
+    std::map<std::size_t, std::unique_ptr<entry>> members_;
+};
+
+class union_t : public entry {
+public:
+    using entry::entry;
+    void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] std::string to_source() const override;
+
+private:
+    std::string name_;
+    std::map<std::size_t, std::unique_ptr<entry>> members_;
 };

@@ -62,6 +62,9 @@ public:
         return type_info_.at(offset);
     }
 
+    void resolve_type(const dw::die &die, const namespace_list &namespaces);
+
+private:
     void parse_children(const dw::die &die, namespace_list &namespaces);
     void parse_namespace(const dw::die &die, namespace_list &namespaces);
     // parse a non-member type, for member types, see parse_member_type

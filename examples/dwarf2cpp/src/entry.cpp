@@ -13,7 +13,7 @@ void parameter_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         const auto type = it->get<dw::die>();
-        parser.parse_type(type, namespaces());
+        parser.resolve_type(type, namespaces());
         type_ = parser.get_type(type.offset());
     }
 }
@@ -38,7 +38,7 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         const auto return_type = it->get<dw::die>();
-        parser.parse_type(return_type, namespaces());
+        parser.resolve_type(return_type, namespaces());
         return_type_ = parser.get_type(return_type.offset());
     }
     for (const auto &child : die) {
@@ -58,9 +58,11 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
 std::string function_t::to_source() const
 {
     std::stringstream ss;
+#ifndef NDEBUG
     if (!linkage_name_.empty()) {
         ss << "// " << linkage_name_ << "\n";
     }
+#endif
     ss << return_type_ << " " << name_;
     ss << "(";
     for (auto i = 0; i < parameters_.size(); ++i) {
@@ -84,7 +86,7 @@ void typedef_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         const auto type = it->get<dw::die>();
-        parser.parse_type(type, namespaces());
+        parser.resolve_type(type, namespaces());
         type_ = parser.get_type(type.offset());
     }
     // TODO: handle anonymous struct here
@@ -102,7 +104,7 @@ void enum_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         const auto type = it->get<dw::die>();
-        parser.parse_type(type, namespaces());
+        parser.resolve_type(type, namespaces());
         base_type_ = parser.get_type(type.offset());
     }
     for (const auto &child : die) {
@@ -128,5 +130,89 @@ std::string enum_t::to_source() const
         ss << "    " << name << " = " << value << ",\n";
     }
     ss << "};";
+    return ss.str();
+}
+
+void struct_t::parse(const dw::die &die, cu_parser &parser)
+{
+    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
+        name_ = it->get<std::string>();
+    }
+
+    auto ns = namespaces();
+    if (!name_.empty()) {
+        ns.push_back(name_);
+    }
+
+    for (const auto &child : die) {
+        std::unique_ptr<entry> entry;
+        std::size_t decl_line = 0;
+        if (const auto it = child.attributes().find(dw::attribute_t::decl_line); it != child.attributes().end()) {
+            decl_line = it->get<std::size_t>();
+        }
+
+        switch (child.tag()) {
+        case dw::tag::inheritance:
+            // TODO: parse inheritance
+            break;
+        case dw::tag::member:
+            // TODO: parse fields
+            break;
+        case dw::tag::subprogram:
+            entry = std::make_unique<function_t>();
+            break;
+        case dw::tag::union_type:
+            entry = std::make_unique<union_t>();
+            break;
+        case dw::tag::structure_type:
+            entry = std::make_unique<struct_t>(false);
+            break;
+        case dw::tag::class_type:
+            entry = std::make_unique<struct_t>(true);
+            break;
+        case dw::tag::enumeration_type:
+            entry = std::make_unique<enum_t>();
+            break;
+        case dw::tag::typedef_:
+            entry = std::make_unique<typedef_t>();
+            break;
+        default:
+            break;
+        }
+        if (entry) {
+            entry->parse(child, parser);
+            members_[decl_line] = std::move(entry);
+        }
+    }
+}
+
+std::string struct_t::to_source() const
+{
+    std::stringstream ss;
+    ss << (is_class_ ? "class " : "struct ") << name_ << " {\n";
+    for (const auto &[line, member] : members_) {
+#ifndef NDEBUG
+        ss << "// Line " << line << "\n";
+#endif
+        ss << member->to_source() << "\n";
+    }
+    ss << "};\n";
+    return ss.str();
+}
+
+void union_t::parse(const dw::die &die, cu_parser &parser)
+{
+    // TODO:
+}
+
+std::string union_t::to_source() const
+{
+    std::stringstream ss;
+    ss << "union" << name_ << " {\n";
+    for (const auto &[line, member] : members_) {
+        ss << "// Line " << line << "\n";
+        ss << member->to_source() << "\n";
+    }
+    ss << "};\n";
     return ss.str();
 }
