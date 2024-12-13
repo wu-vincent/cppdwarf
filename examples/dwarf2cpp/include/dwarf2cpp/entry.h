@@ -71,6 +71,7 @@ private:
     std::vector<std::unique_ptr<parameter_t>> parameters_;
     bool is_const_{false};
     bool is_member_{false};
+    bool is_explicit_{false};
     dw::virtuality virtuality_{dw::virtuality::none};
     std::optional<dw::access> access_;
 };
@@ -90,6 +91,7 @@ private:
     std::string type_{"<check>"};
     std::optional<std::size_t> member_location_;
     std::optional<dw::access> access_;
+    bool is_static{false};
 };
 
 class typedef_t : public entry {

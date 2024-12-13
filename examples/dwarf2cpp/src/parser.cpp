@@ -138,9 +138,14 @@ void cu_parser::parse_types(const dw::die &die, namespace_list &parents) // NOLI
 
         switch (tag) {
         case dw::tag::namespace_: {
-            parents.push_back(name);
-            parse_types(child, parents);
-            parents.pop_back();
+            if (name == "__1" && parents.size() == 1 && parents.at(0) == "std") {
+                parse_types(child, parents);
+            }
+            else {
+                parents.push_back(name);
+                parse_types(child, parents);
+                parents.pop_back();
+            }
             break;
         }
         case dw::tag::base_type: {
@@ -197,9 +202,14 @@ void cu_parser::parse_children(const dw::die &die, namespace_list &namespaces) /
         }
 
         if (tag == dw::tag::namespace_) {
-            namespaces.push_back(name);
-            parse_children(child, namespaces);
-            namespaces.pop_back();
+            if (name == "__1" && namespaces.size() == 1 && namespaces.at(0) == "std") {
+                parse_children(child, namespaces);
+            }
+            else {
+                namespaces.push_back(name);
+                parse_children(child, namespaces);
+                namespaces.pop_back();
+            }
             continue;
         }
 

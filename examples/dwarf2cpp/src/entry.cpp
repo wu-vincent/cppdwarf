@@ -6,6 +6,7 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
 
+#include "dwarf2cpp/algorithm.hpp"
 #include "dwarf2cpp/parser.h"
 
 template <>
@@ -22,7 +23,7 @@ std::string to_string(dw::access a)
     case dw::access::private_:
         return "private";
     default:
-        return "<unknown access>";
+        throw std::runtime_error("unknown access");
     }
 }
 } // namespace
@@ -62,6 +63,9 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         const auto return_type = it->get<dw::die>();
         return_type_ = parser.get_type(it->get<dw::die>());
+    }
+    if (const auto it = die.attributes().find(dw::attribute_t::explicit_); it != die.attributes().end()) {
+        is_explicit_ = it->get<bool>();
     }
     if (const auto it = die.attributes().find(dw::attribute_t::virtuality); it != die.attributes().end()) {
         virtuality_ = static_cast<dw::virtuality>(it->get<int>());
@@ -105,8 +109,13 @@ std::string function_t::to_source() const
     if (virtuality_ > dw::virtuality::none) {
         ss << "virtual ";
     }
-    ss << return_type_ << " " << name_;
-    ss << "(";
+    if (!linkage_name_.empty() && !starts_with(name_, "operator ")) {
+        ss << return_type_ << " ";
+    }
+    if (is_explicit_) {
+        ss << "explicit ";
+    }
+    ss << name_ << "(";
     for (; it != parameters_.end(); ++it) {
         ss << (*it)->to_source();
         if (it < parameters_.end() - 1) {
@@ -138,12 +147,18 @@ void field_t::parse(const dw::die &die, cu_parser &parser)
     if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
         access_ = static_cast<dw::access>(it->get<int>());
     }
+    if (const auto it = die.attributes().find(dw::attribute_t::external); it != die.attributes().end()) {
+        is_static = it->get<bool>();
+    }
     // TODO: handle anonymous struct here
 }
 
 std::string field_t::to_source() const
 {
     std::stringstream ss;
+    if (is_static) {
+        ss << "static ";
+    }
     ss << type_ << " " << name_ << ";";
     if (member_location_.has_value()) {
         ss << " // +" << member_location_.value();
