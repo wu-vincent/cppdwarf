@@ -150,6 +150,17 @@ template <>
 }
 
 template <>
+[[nodiscard]] inline bool attribute::get<bool>() const
+{
+    Dwarf_Bool value = 0;
+    Dwarf_Error error = nullptr;
+    if (dwarf_formflag(attr_, &value, &error) != DW_DLV_OK) {
+        throw type_error("dwarf_formflag failed!");
+    }
+    return value != 0;
+}
+
+template <>
 [[nodiscard]] inline int attribute::get<int>() const
 {
     return static_cast<int>(get_integer());

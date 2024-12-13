@@ -15,6 +15,9 @@ void parameter_t::parse(const dw::die &die, cu_parser &parser)
         const auto type = it->get<dw::die>();
         type_ = parser.get_type(it->get<dw::die>());
     }
+    if (const auto it = die.attributes().find(dw::attribute_t::artificial); it != die.attributes().end()) {
+        is_artificial_ = it->get<bool>();
+    }
 }
 
 std::string parameter_t::to_source() const
@@ -39,6 +42,8 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
         const auto return_type = it->get<dw::die>();
         return_type_ = parser.get_type(it->get<dw::die>());
     }
+
+    int param_index = 0;
     for (const auto &child : die) {
         switch (child.tag()) {
         case dw::tag::formal_parameter: {
@@ -50,6 +55,7 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
             // TODO: extract information about template params
             break;
         }
+        param_index++;
     }
 }
 
@@ -59,13 +65,23 @@ std::string function_t::to_source() const
     // if (!linkage_name_.empty()) {
     //     ss << "// " << linkage_name_ << "\n";
     // }
+    auto it = parameters_.begin();
+    if (is_member_ && it != parameters_.end()) {
+        auto &first_param = *it;
+        if (first_param->is_artificial()) {
+            it = std::next(it);
+        }
+        else {
+            ss << "static ";
+        }
+    }
     ss << return_type_ << " " << name_;
     ss << "(";
-    for (auto i = 0; i < parameters_.size(); ++i) {
-        if (i > 0) {
+    for (; it != parameters_.end(); ++it) {
+        ss << (*it)->to_source();
+        if (it < parameters_.end() - 1) {
             ss << ", ";
         }
-        ss << parameters_[i]->to_source();
     }
     ss << ")";
     if (is_const_) {
@@ -160,6 +176,10 @@ void struct_t::parse(const dw::die &die, cu_parser &parser)
             decl_line = it->get<std::size_t>();
         }
 
+        if (decl_line <= 0) {
+            continue;
+        }
+
         switch (child.tag()) {
         case dw::tag::inheritance:
             // TODO: parse inheritance
@@ -168,7 +188,7 @@ void struct_t::parse(const dw::die &die, cu_parser &parser)
             entry = std::make_unique<field_t>();
             break;
         case dw::tag::subprogram:
-            entry = std::make_unique<function_t>();
+            entry = std::make_unique<function_t>(true);
             break;
         case dw::tag::union_type:
             entry = std::make_unique<union_t>();
@@ -199,11 +219,15 @@ std::string struct_t::to_source() const
 {
     std::stringstream ss;
     ss << (is_class_ ? "class " : "struct ") << name_ << " {\n";
-    for (const auto &[line, member] : members_) {
+    for (const auto &[decl_line, member] : members_) {
 #ifndef NDEBUG
         // ss << "// Line " << line << "\n";
 #endif
-        ss << member->to_source() << "\n";
+        std::stringstream ss2(member->to_source());
+        std::string line;
+        while (std::getline(ss2, line)) {
+            ss << "    " << line << "\n";
+        }
     }
     ss << "};\n";
     return ss.str();
@@ -227,7 +251,7 @@ void union_t::parse(const dw::die &die, cu_parser &parser)
             entry = std::make_unique<field_t>();
             break;
         case dw::tag::subprogram:
-            entry = std::make_unique<function_t>();
+            entry = std::make_unique<function_t>(true);
             break;
         case dw::tag::union_type:
             entry = std::make_unique<union_t>();
@@ -258,9 +282,13 @@ std::string union_t::to_source() const
 {
     std::stringstream ss;
     ss << "union" << name_ << " {\n";
-    for (const auto &[line, member] : members_) {
+    for (const auto &[decl_line, member] : members_) {
         // ss << "// Line " << line << "\n";
-        ss << member->to_source() << "\n";
+        std::stringstream ss2(member->to_source());
+        std::string line;
+        while (std::getline(ss2, line)) {
+            ss << "    " << line << "\n";
+        }
     }
     ss << "};\n";
     return ss.str();

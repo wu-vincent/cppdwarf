@@ -20,7 +20,7 @@ void debug_parser::parse()
         base_dir_ = posixpath::commonpath({cu_base_dir, base_dir_});
         i++;
 
-        if (i >= 2) {
+        if (i >= 10) {
             break;
         }
     }
@@ -103,10 +103,19 @@ std::string cu_parser::get_type(const dw::die &die)
             type_name = "restrict " + type_name;
             break;
         }
+        case dw::tag::ptr_to_member_type: {
+            auto containing_type = die.attributes().at(dw::attribute_t::containing_type).get<dw::die>();
+            type_name += " " + get_type(containing_type) + "::" + "*";
+            break;
+        }
+        case dw::tag::subroutine_type: {
+            break;
+        }
         default: {
             std::stringstream ss;
             ss << "<" << die.tag() << ">";
             type_name = ss.str();
+            break;
         }
         }
         type_info_[die.offset()] = type_name;
@@ -225,7 +234,7 @@ void cu_parser::parse_children(const dw::die &die, namespace_list &namespaces) /
             break;
         }
         case dw::tag::subprogram: {
-            entry = std::make_unique<function_t>(namespaces);
+            entry = std::make_unique<function_t>(false, namespaces);
             break;
         }
         default:
