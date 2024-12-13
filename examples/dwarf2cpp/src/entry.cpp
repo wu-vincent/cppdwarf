@@ -6,7 +6,7 @@
 
 #include "dwarf2cpp/parser.h"
 
-void parameter::parse(const dw::die &die, cu_parser &parser)
+void parameter_t::parse(const dw::die &die, cu_parser &parser)
 {
     if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
         name_ = it->get<std::string>();
@@ -18,12 +18,12 @@ void parameter::parse(const dw::die &die, cu_parser &parser)
     }
 }
 
-std::string parameter::to_source() const
+std::string parameter_t::to_source() const
 {
     return type_ + " " + name_;
 }
 
-void function::parse(const dw::die &die, cu_parser &parser)
+void function_t::parse(const dw::die &die, cu_parser &parser)
 {
     name_ = die.attributes().at(dw::attribute_t::name).get<std::string>();
     if (const auto it = die.attributes().find(dw::attribute_t::linkage_name); it != die.attributes().end()) {
@@ -44,7 +44,7 @@ void function::parse(const dw::die &die, cu_parser &parser)
     for (const auto &child : die) {
         switch (child.tag()) {
         case dw::tag::formal_parameter: {
-            auto param = std::make_unique<parameter>();
+            auto param = std::make_unique<parameter_t>();
             param->parse(child, parser);
             parameters_.push_back(std::move(param));
         }
@@ -55,7 +55,7 @@ void function::parse(const dw::die &die, cu_parser &parser)
     }
 }
 
-std::string function::to_source() const
+std::string function_t::to_source() const
 {
     std::stringstream ss;
     if (!linkage_name_.empty()) {
@@ -75,4 +75,22 @@ std::string function::to_source() const
     }
     ss << ";";
     return ss.str();
+}
+
+void typedef_t::parse(const dw::die &die, cu_parser &parser)
+{
+    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
+        name_ = it->get<std::string>();
+    }
+    if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
+        const auto type = it->get<dw::die>();
+        parser.parse_type(type, namespaces());
+        type_ = parser.get_type(type.offset());
+    }
+    // TODO: handle anonymous struct here
+}
+
+std::string typedef_t::to_source() const
+{
+    return "using " + name_ + " = " + type_ + ";";
 }

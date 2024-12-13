@@ -183,8 +183,19 @@ void cu_parser::parse_type(const dw::die &die, const namespace_list &namespaces)
     }
 
     // result_[decl_file][decl_line] = get_qualified_name(namespaces, name);
+    std::unique_ptr<entry> entry;
+    switch (die.tag()) {
+    case dw::tag::typedef_:
+        entry = std::make_unique<typedef_t>(namespaces);
+    default:
+        // TODO: parse types such as struct, class, union, enum here
+        break;
+    }
 
-    // TODO: parse types such as typedef, struct, class, union, enum here
+    if (entry) {
+        entry->parse(die, *this);
+        add_entry(decl_file, decl_line, std::move(entry));
+    }
 }
 void cu_parser::parse_function(const dw::die &die, const namespace_list &namespaces)
 {
@@ -206,7 +217,7 @@ void cu_parser::parse_function(const dw::die &die, const namespace_list &namespa
         return;
     }
 
-    auto func = std::make_unique<function>(namespaces);
+    auto func = std::make_unique<function_t>(namespaces);
     func->parse(die, *this);
     add_entry(decl_file, decl_line, std::move(func));
     // TODO: parse non-member function here

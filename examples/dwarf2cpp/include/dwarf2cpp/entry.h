@@ -11,7 +11,6 @@ class cu_parser;
 
 class entry {
 public:
-    using type_info = std::unordered_map<std::size_t, std::string>;
     using namespace_list = std::vector<std::string>;
 
     explicit entry(namespace_list namespaces = {}) : namespaces_(std::move(namespaces)){};
@@ -29,7 +28,7 @@ private:
     namespace_list namespaces_;
 };
 
-class parameter : public entry {
+class parameter_t : public entry {
 public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
@@ -37,10 +36,10 @@ public:
 
 private:
     std::string name_;
-    std::string type_;
+    std::string type_{"<bad type>"};
 };
 
-class function : public entry {
+class function_t : public entry {
 public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
@@ -50,6 +49,17 @@ private:
     std::string name_;
     std::string linkage_name_;
     std::string return_type_{"void"};
-    std::vector<std::unique_ptr<parameter>> parameters_;
+    std::vector<std::unique_ptr<parameter_t>> parameters_;
     bool is_const_{false};
+};
+
+class typedef_t : public entry {
+public:
+    using entry::entry;
+    void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] std::string to_source() const override;
+
+private:
+    std::string name_;
+    std::string type_{"<bad typedef>"};
 };
