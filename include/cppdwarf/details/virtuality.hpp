@@ -1,20 +1,24 @@
 #pragma once
 
 #include <dwarf.h>
+#include <libdwarf.h>
+
+#include <ostream>
 
 namespace cppdwarf {
-enum class access {
-    public_ = DW_ACCESS_public,
-    protected_ = DW_ACCESS_protected,
-    private_ = DW_ACCESS_private,
+
+enum class virtuality {
+    none = DW_VIRTUALITY_none,
+    virtual_ = DW_VIRTUALITY_virtual,
+    pure_virtual = DW_VIRTUALITY_pure_virtual,
 };
 
-inline std::ostream &operator<<(std::ostream &os, access a)
+inline std::ostream &operator<<(std::ostream &os, virtuality v)
 {
     const char *name = nullptr;
-    int res = dwarf_get_ACCESS_name(static_cast<Dwarf_Half>(a), &name);
+    int res = dwarf_get_VIRTUALITY_name(static_cast<Dwarf_Half>(v), &name);
     if (res != DW_DLV_OK) {
-        os << "<bogus access>";
+        os << "<bogus virtuality>";
     }
     else {
         os << name;

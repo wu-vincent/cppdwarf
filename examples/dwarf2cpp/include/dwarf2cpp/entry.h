@@ -20,6 +20,10 @@ public:
     virtual ~entry() = default;
     virtual void parse(const dw::die &die, cu_parser &parser) = 0;
     [[nodiscard]] virtual std::string to_source() const = 0;
+    [[nodiscard]] virtual std::optional<dw::access> access() const
+    {
+        return std::nullopt;
+    }
 
     [[nodiscard]] namespace_list namespaces() const
     {
@@ -55,6 +59,10 @@ public:
     }
     void parse(const dw::die &die, cu_parser &parser) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] std::optional<dw::access> access() const override
+    {
+        return access_;
+    }
 
 private:
     std::string name_;
@@ -64,6 +72,7 @@ private:
     bool is_const_{false};
     bool is_member_{false};
     dw::virtuality virtuality_{dw::virtuality::none};
+    std::optional<dw::access> access_;
 };
 
 class field_t : public entry {
@@ -71,11 +80,16 @@ public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] std::optional<dw::access> access() const override
+    {
+        return access_;
+    }
 
 private:
     std::string name_;
     std::string type_{"<check>"};
     std::optional<std::size_t> member_location_;
+    std::optional<dw::access> access_;
 };
 
 class typedef_t : public entry {
@@ -83,10 +97,15 @@ public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] std::optional<dw::access> access() const override
+    {
+        return access_;
+    }
 
 private:
     std::string name_;
     std::string type_{"<check>"};
+    std::optional<dw::access> access_;
 };
 
 class enum_t : public entry {
@@ -98,11 +117,16 @@ public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] std::optional<dw::access> access() const override
+    {
+        return access_;
+    }
 
 private:
     std::string name_;
     std::string base_type_;
     std::vector<enumerator_t> enumerators_;
+    std::optional<dw::access> access_;
 };
 
 class struct_t : public entry {
@@ -112,12 +136,18 @@ public:
     }
     void parse(const dw::die &die, cu_parser &parser) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] std::optional<dw::access> access() const override
+    {
+        return access_;
+    }
 
 private:
     std::string name_;
     bool is_class_;
     std::map<std::size_t, std::unique_ptr<entry>> members_;
     std::optional<std::size_t> byte_size;
+    std::vector<std::pair<dw::access, std::string>> base_classes_;
+    std::optional<dw::access> access_;
 };
 
 class union_t : public entry {
@@ -125,8 +155,13 @@ public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
     [[nodiscard]] std::string to_source() const override;
+    [[nodiscard]] std::optional<dw::access> access() const override
+    {
+        return access_;
+    }
 
 private:
     std::string name_;
     std::map<std::size_t, std::unique_ptr<entry>> members_;
+    std::optional<dw::access> access_;
 };

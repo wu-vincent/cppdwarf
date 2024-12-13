@@ -3,8 +3,29 @@
 #include <sstream>
 
 #include <llvm/Demangle/Demangle.h>
+#include <spdlog/fmt/ostr.h>
+#include <spdlog/spdlog.h>
 
 #include "dwarf2cpp/parser.h"
+
+template <>
+struct fmt::formatter<dw::die> : ostream_formatter {};
+
+namespace {
+std::string to_string(dw::access a)
+{
+    switch (a) {
+    case dw::access::public_:
+        return "public";
+    case dw::access::protected_:
+        return "protected";
+    case dw::access::private_:
+        return "private";
+    default:
+        return "<unknown access>";
+    }
+}
+} // namespace
 
 void parameter_t::parse(const dw::die &die, cu_parser &parser)
 {
@@ -44,6 +65,9 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::virtuality); it != die.attributes().end()) {
         virtuality_ = static_cast<dw::virtuality>(it->get<int>());
+    }
+    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
+        access_ = static_cast<dw::access>(it->get<int>());
     }
 
     int param_index = 0;
@@ -111,6 +135,9 @@ void field_t::parse(const dw::die &die, cu_parser &parser)
     if (const auto it = die.attributes().find(dw::attribute_t::data_member_location); it != die.attributes().end()) {
         member_location_ = it->get<std::size_t>();
     }
+    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
+        access_ = static_cast<dw::access>(it->get<int>());
+    }
     // TODO: handle anonymous struct here
 }
 
@@ -133,6 +160,9 @@ void typedef_t::parse(const dw::die &die, cu_parser &parser)
         const auto type = it->get<dw::die>();
         type_ = parser.get_type(it->get<dw::die>());
     }
+    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
+        access_ = static_cast<dw::access>(it->get<int>());
+    }
     // TODO: handle anonymous struct here
 }
 
@@ -148,6 +178,9 @@ void enum_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         base_type_ = parser.get_type(it->get<dw::die>());
+    }
+    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
+        access_ = static_cast<dw::access>(it->get<int>());
     }
     for (const auto &child : die) {
         if (child.tag() != dw::tag::enumerator) {
@@ -180,9 +213,11 @@ void struct_t::parse(const dw::die &die, cu_parser &parser)
     if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
         name_ = it->get<std::string>();
     }
-
     if (const auto it = die.attributes().find(dw::attribute_t::byte_size); it != die.attributes().end()) {
         byte_size = it->get<std::size_t>();
+    }
+    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
+        access_ = static_cast<dw::access>(it->get<int>());
     }
 
     for (const auto &child : die) {
@@ -192,14 +227,17 @@ void struct_t::parse(const dw::die &die, cu_parser &parser)
             decl_line = it->get<std::size_t>();
         }
 
-        if (decl_line <= 0) {
-            continue;
-        }
-
         switch (child.tag()) {
-        case dw::tag::inheritance:
-            // TODO: parse inheritance
+        case dw::tag::inheritance: {
+            auto access = (is_class_ ? dw::access::private_ : dw::access::public_);
+            if (const auto it = child.attributes().find(dw::attribute_t::accessibility);
+                it != child.attributes().end()) {
+                access = static_cast<dw::access>(it->get<int>());
+            }
+            auto type = parser.get_type(child.attributes().find(dw::attribute_t::type)->get<dw::die>());
+            base_classes_.emplace_back(access, type);
             break;
+        }
         case dw::tag::member:
             entry = std::make_unique<field_t>();
             break;
@@ -224,7 +262,8 @@ void struct_t::parse(const dw::die &die, cu_parser &parser)
         default:
             break;
         }
-        if (entry) {
+
+        if (entry && decl_line > 0) {
             entry->parse(child, parser);
             members_[decl_line] = std::move(entry);
         }
@@ -233,9 +272,33 @@ void struct_t::parse(const dw::die &die, cu_parser &parser)
 
 std::string struct_t::to_source() const
 {
+    auto default_access = (is_class_ ? dw::access::private_ : dw::access::public_);
+
     std::stringstream ss;
-    ss << (is_class_ ? "class " : "struct ") << name_ << " {\n";
+    ss << (is_class_ ? "class " : "struct ") << name_;
+    if (!base_classes_.empty()) {
+        ss << ": ";
+        for (auto i = 0; i < base_classes_.size(); ++i) {
+            if (i > 0) {
+                ss << ", ";
+            }
+            const auto &[access, base] = base_classes_[i];
+            if (access != default_access) {
+                ss << to_string(access) << " ";
+            }
+            ss << base;
+        }
+    }
+    ss << " {\n";
+
+    auto last_access = default_access;
     for (const auto &[decl_line, member] : members_) {
+        auto current_access = member->access().value_or(default_access);
+        if (current_access != last_access) {
+            ss << to_string(current_access) << ":\n";
+            last_access = current_access;
+        }
+
 #ifndef NDEBUG
         // ss << "// Line " << line << "\n";
 #endif
@@ -256,6 +319,9 @@ void union_t::parse(const dw::die &die, cu_parser &parser)
 {
     if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
         name_ = it->get<std::string>();
+    }
+    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
+        access_ = static_cast<dw::access>(it->get<int>());
     }
 
     for (const auto &child : die) {
