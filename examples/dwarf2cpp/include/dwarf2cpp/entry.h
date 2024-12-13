@@ -92,6 +92,7 @@ private:
     std::optional<std::size_t> member_location_;
     std::optional<dw::access> access_;
     bool is_static{false};
+    std::optional<std::int64_t> default_value_;
 };
 
 class typedef_t : public entry {

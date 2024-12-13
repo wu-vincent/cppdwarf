@@ -150,6 +150,9 @@ void field_t::parse(const dw::die &die, cu_parser &parser)
     if (const auto it = die.attributes().find(dw::attribute_t::external); it != die.attributes().end()) {
         is_static = it->get<bool>();
     }
+    if (const auto it = die.attributes().find(dw::attribute_t::const_value); it != die.attributes().end()) {
+        default_value_ = it->get<std::int64_t>();
+    }
     // TODO: handle anonymous struct here
 }
 
@@ -159,7 +162,24 @@ std::string field_t::to_source() const
     if (is_static) {
         ss << "static ";
     }
-    ss << type_ << " " << name_ << ";";
+    ss << type_ << " " << name_;
+    if (default_value_.has_value()) {
+        ss << " = ";
+        if (ends_with(type_, "float")) {
+            auto value = static_cast<std::int32_t>(default_value_.value());
+            constexpr auto max_precision{std::numeric_limits<float>::digits10 + 1};
+            ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<float *>(&value);
+        }
+        else if (ends_with(type_, "double")) {
+            auto value = default_value_.value();
+            constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
+            ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);
+        }
+        else {
+            ss << default_value_.value();
+        }
+    }
+    ss << ";";
     if (member_location_.has_value()) {
         ss << " // +" << member_location_.value();
     }
