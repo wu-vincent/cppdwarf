@@ -13,8 +13,7 @@ void parameter_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         const auto type = it->get<dw::die>();
-        parser.resolve_type(type, {});
-        type_ = parser.get_type(type.offset());
+        type_ = parser.get_type(it->get<dw::die>());
     }
 }
 
@@ -38,8 +37,7 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         const auto return_type = it->get<dw::die>();
-        parser.resolve_type(return_type, {});
-        return_type_ = parser.get_type(return_type.offset());
+        return_type_ = parser.get_type(it->get<dw::die>());
     }
     for (const auto &child : die) {
         switch (child.tag()) {
@@ -83,9 +81,7 @@ void field_t::parse(const dw::die &die, cu_parser &parser)
         name_ = it->get<std::string>();
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
-        const auto type = it->get<dw::die>();
-        parser.resolve_type(type, {});
-        type_ = parser.get_type(type.offset());
+        type_ = parser.get_type(it->get<dw::die>());
     }
     // TODO: handle anonymous struct here
 }
@@ -102,8 +98,7 @@ void typedef_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
         const auto type = it->get<dw::die>();
-        parser.resolve_type(type, {});
-        type_ = parser.get_type(type.offset());
+        type_ = parser.get_type(it->get<dw::die>());
     }
     // TODO: handle anonymous struct here
 }
@@ -119,9 +114,7 @@ void enum_t::parse(const dw::die &die, cu_parser &parser)
         name_ = it->get<std::string>();
     }
     if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
-        const auto type = it->get<dw::die>();
-        parser.resolve_type(type, {});
-        base_type_ = parser.get_type(type.offset());
+        base_type_ = parser.get_type(it->get<dw::die>());
     }
     for (const auto &child : die) {
         if (child.tag() != dw::tag::enumerator) {

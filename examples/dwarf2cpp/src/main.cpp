@@ -12,9 +12,6 @@
 namespace dw = cppdwarf;
 namespace fs = std::filesystem;
 
-template <>
-struct fmt::formatter<dw::die> : ostream_formatter {};
-
 using file_entry_storage = std::unordered_map<std::string, std::unordered_set<std::string>>;
 
 int main(int argc, char *argv[])

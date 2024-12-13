@@ -57,14 +57,11 @@ public:
         return base_dir_;
     }
 
-    [[nodiscard]] std::string get_type(const std::size_t offset) const
-    {
-        return type_info_.at(offset);
-    }
-
-    void resolve_type(const dw::die &die, const namespace_list &namespaces);
+    [[nodiscard]] std::string get_type(const dw::die &die);
 
 private:
+    void parse_types(const dw::die &die, namespace_list &parents);
+
     void parse_children(const dw::die &die, namespace_list &namespaces);
     void parse_namespace(const dw::die &die, namespace_list &namespaces);
     // parse a non-member type, for member types, see parse_member_type

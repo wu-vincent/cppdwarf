@@ -1,6 +1,10 @@
 #include "dwarf2cpp/parser.h"
 
+#include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
+
+template <>
+struct fmt::formatter<dw::die> : ostream_formatter {};
 
 void debug_parser::parse()
 {
@@ -33,104 +37,143 @@ cu_parser::cu_parser(dw::compilation_unit &cu, debug_parser &dbg_parser) : cu_(c
 
 void cu_parser::parse()
 {
-    namespace_list namespaces;
-    parse_children(cu_.die(), namespaces);
+    std::vector<std::string> parents;
+
+    // first pass: parse all types with names
+    parse_types(cu_.die(), parents);
     // for (const auto &[offset, type] : type_info_) {
     //     spdlog::info("{} {}", offset, type);
     // }
+
+    // second pass: parse all functions and classes
+    parse_children(cu_.die(), parents);
 }
 
-void cu_parser::resolve_type(const dw::die &die, const namespace_list &namespaces) // NOLINT(*-no-recursion)
+std::string cu_parser::get_type(const dw::die &die)
 {
-    if (type_info_.find(die.offset()) != type_info_.end()) {
-        // we've already fully parsed the type
-        return;
-    }
-    std::string name;
-    std::unique_ptr<dw::die> type;
-    if (auto it = die.find(dw::attribute_t::name); it != die.attributes().end()) {
-        name = it->get<std::string>();
-    }
-    if (auto it = die.find(dw::attribute_t::type); it != die.attributes().end()) {
-        type = it->get<std::unique_ptr<dw::die>>();
-    }
+    auto it = type_info_.find(die.offset());
+    if (it == type_info_.end()) {
+        std::unique_ptr<dw::die> type;
+        std::string type_name = "void";
+        if (auto attr = die.find(dw::attribute_t::type); attr != die.attributes().end()) {
+            type = attr->get<std::unique_ptr<dw::die>>();
+            type_name = get_type(*type);
+        }
 
-    if (!name.empty()) { // we already know the name, no need to resolve the type chain
-        if (die.tag() == dw::tag::base_type) {
-            type_info_.emplace(die.offset(), name);
-        }
-        else {
-            type_info_.emplace(die.offset(), get_qualified_name(namespaces, name));
-        }
-    }
-    else if (die.tag() == dw::tag::base_type) {
-        // base_type without a name implies void
-        type_info_.emplace(die.offset(), "void");
-    }
-    else if (type != nullptr) {
-        // we don't have a name and we are not a base_type (i.e. not 'void'), but we have a ref to type.
-        // solve the type chain iteratively.
-        resolve_type(*type, namespaces);
-        // at this point we should know everything about the underlying type
-        auto type_name = type_info_.at(type->offset());
         switch (die.tag()) {
-        case dw::tag::const_type:
-            type_name += " const";
-            break;
-        case dw::tag::pointer_type:
-            type_name += "*";
-            break;
         case dw::tag::array_type: {
             int array_size = 0;
             for (const auto &child : die) {
                 if (child.tag() != dw::tag::subrange_type) {
                     continue;
                 }
-                if (auto it = child.find(dw::attribute_t::count); it != child.attributes().end()) {
-                    array_size += it->get<int>();
+                if (auto attr = child.find(dw::attribute_t::count); attr != child.attributes().end()) {
+                    array_size += attr->get<int>();
                     break;
                 }
-                if (auto it = child.find(dw::attribute_t::upper_bound); it != child.attributes().end()) {
-                    array_size += it->get<int>() + 1;
+                if (auto attr = child.find(dw::attribute_t::upper_bound); attr != child.attributes().end()) {
+                    array_size += attr->get<int>() + 1;
                     break;
                 }
             }
             type_name += "[" + std::to_string(array_size) + "]";
             break;
         }
-        case dw::tag::reference_type:
+        case dw::tag::pointer_type: {
+            type_name += "*";
+            break;
+        }
+        case dw::tag::reference_type: {
             type_name += "&";
             break;
-        case dw::tag::rvalue_reference_type:
+        }
+        case dw::tag::rvalue_reference_type: {
             type_name += "&&";
             break;
-        case dw::tag::volatile_type:
-            type_name = "volatile " + type_name;
-            break;
-        default:
+        }
+        case dw::tag::const_type: {
+            type_name = "const " + type_name;
             break;
         }
-        type_info_.emplace(die.offset(), type_name);
+        case dw::tag::atomic_type: {
+            type_name = "_Atomic " + type_name;
+            break;
+        }
+        case dw::tag::restrict_type: {
+            type_name = "restrict " + type_name;
+            break;
+        }
+        default: {
+            std::stringstream ss;
+            ss << "<" << die.tag() << ">";
+            type_name = ss.str();
+        }
+        }
+        type_info_[die.offset()] = type_name;
     }
-    else {
-        // no name, no type
-        std::stringstream ss;
-        ss << '<' << die.tag() << '>';
-        std::string type_name = ss.str();
-        switch (die.tag()) {
-        case dw::tag::const_type:
-            type_name = "void const";
-            break;
-        case dw::tag::pointer_type:
-            type_name = "void *";
-            break;
-        case dw::tag::reference_type:
-            type_name = "void &";
-            break;
-        default:
+    return type_info_.at(die.offset());
+}
+
+void cu_parser::parse_types(const dw::die &die, namespace_list &parents) // NOLINT(*-no-recursion)
+{
+    for (const auto &child : die) {
+        if (type_info_.find(child.offset()) != type_info_.end()) {
+            continue;
+        }
+
+        const auto tag = child.tag();
+        std::string name;
+        if (auto it = child.find(dw::attribute_t::name); it != child.attributes().end()) {
+            name = it->get<std::string>();
+        }
+
+        switch (tag) {
+        case dw::tag::namespace_: {
+            parents.push_back(name);
+            parse_types(child, parents);
+            parents.pop_back();
             break;
         }
-        type_info_.emplace(die.offset(), type_name);
+        case dw::tag::base_type: {
+            if (name.empty()) {
+                name = "void";
+            }
+            type_info_[child.offset()] = get_qualified_name(parents, name);
+            break;
+        }
+        case dw::tag::typedef_: {
+            if (name.empty()) {
+                throw std::runtime_error("invalid typedef");
+            }
+            type_info_[child.offset()] = get_qualified_name(parents, name);
+            break;
+        }
+        case dw::tag::unspecified_type: {
+            if (name.empty()) {
+                throw std::runtime_error("invalid unspecified type");
+            }
+            type_info_[child.offset()] = get_qualified_name(parents, name);
+            break;
+        }
+        case dw::tag::class_type:
+        case dw::tag::structure_type:
+        case dw::tag::union_type:
+        case dw::tag::enumeration_type: {
+            if (!name.empty()) {
+                type_info_[child.offset()] = get_qualified_name(parents, name);
+            }
+            else {
+                type_info_[child.offset()] = "<unnamed>";
+            }
+            parents.push_back(name);
+            parse_types(child, parents);
+            parents.pop_back();
+            break;
+        }
+        default: {
+            break;
+        }
+        }
     }
 }
 
@@ -138,118 +181,62 @@ void cu_parser::parse_children(const dw::die &die, namespace_list &namespaces) /
 {
     for (const auto &child : die) {
         const auto tag = child.tag();
+
+        std::string name;
+        if (auto it = child.find(dw::attribute_t::name); it != child.attributes().end()) {
+            name = it->get<std::string>();
+        }
+
+        if (tag == dw::tag::namespace_) {
+            namespaces.push_back(name);
+            parse_children(child, namespaces);
+            namespaces.pop_back();
+            continue;
+        }
+
+        std::string decl_file;
+        int decl_line = 0;
+        if (auto it = child.find(dw::attribute_t::decl_file); it != child.attributes().end()) {
+            decl_file = posixpath::normpath(src_files_[it->get<int>()]);
+        }
+        if (auto it = child.find(dw::attribute_t::decl_line); it != child.attributes().end()) {
+            decl_line = it->get<int>();
+        }
+
+        if (name.empty() || decl_file.empty() || decl_line <= 0) {
+            continue;
+        }
+        std::unique_ptr<entry> entry;
         switch (tag) {
-        case dw::tag::namespace_:
-            // A namespace can contain declarations from multiple files - we don't want this
-            // To solve this, we go inside the namespaces and start there again as the top level
-            parse_namespace(child, namespaces);
+        case dw::tag::class_type: {
+            entry = std::make_unique<struct_t>(true, namespaces);
             break;
-        case dw::tag::base_type:
-        case dw::tag::unspecified_type:
-        case dw::tag::typedef_:
-        case dw::tag::class_type:
-        case dw::tag::structure_type:
-        case dw::tag::union_type:
-        case dw::tag::enumeration_type:
-        case dw::tag::array_type:
-        case dw::tag::pointer_type:
-        case dw::tag::const_type:
-        case dw::tag::rvalue_reference_type:
-        case dw::tag::reference_type:
-            parse_type(child, namespaces);
+        }
+        case dw::tag::structure_type: {
+            entry = std::make_unique<struct_t>(false, namespaces);
             break;
-        case dw::tag::subprogram:
-            parse_function(child, namespaces);
+        }
+        case dw::tag::union_type: {
+            entry = std::make_unique<union_t>(namespaces);
             break;
+        }
+        case dw::tag::enumeration_type: {
+            entry = std::make_unique<enum_t>(namespaces);
+            break;
+        }
+        case dw::tag::subprogram: {
+            entry = std::make_unique<function_t>(namespaces);
+            break;
+        }
         default:
             break;
         }
-    }
-}
 
-void cu_parser::parse_namespace(const dw::die &die, namespace_list &namespaces) // NOLINT(*-no-recursion)
-{
-    std::string name;
-    if (auto it = die.find(dw::attribute_t::name); it != die.attributes().end()) {
-        name = it->get<std::string>();
+        if (entry) {
+            entry->parse(child, *this);
+            add_entry(decl_file, decl_line, std::move(entry));
+        }
     }
-    namespaces.push_back(name);
-    parse_children(die, namespaces);
-    namespaces.pop_back();
-}
-
-void cu_parser::parse_type(const dw::die &die, const namespace_list &namespaces)
-{
-    std::string name;
-    std::string decl_file;
-    int decl_line = 0;
-    if (auto it = die.find(dw::attribute_t::name); it != die.attributes().end()) {
-        name = it->get<std::string>();
-    }
-    if (auto it = die.find(dw::attribute_t::decl_file); it != die.attributes().end()) {
-        decl_file = posixpath::normpath(src_files_[it->get<int>()]);
-    }
-    if (auto it = die.find(dw::attribute_t::decl_line); it != die.attributes().end()) {
-        decl_line = it->get<int>();
-    }
-
-    resolve_type(die, namespaces);
-
-    if (name.empty() || decl_file.empty() || decl_line <= 0) {
-        return;
-    }
-
-    // result_[decl_file][decl_line] = get_qualified_name(namespaces, name);
-    std::unique_ptr<entry> entry;
-    switch (die.tag()) {
-    case dw::tag::typedef_:
-        entry = std::make_unique<typedef_t>(namespaces);
-        break;
-    case dw::tag::enumeration_type:
-        entry = std::make_unique<enum_t>(namespaces);
-        break;
-    case dw::tag::structure_type:
-        entry = std::make_unique<struct_t>(false, namespaces);
-        break;
-    case dw::tag::class_type:
-        entry = std::make_unique<struct_t>(true, namespaces);
-        break;
-    case dw::tag::union_type:
-        entry = std::make_unique<union_t>(namespaces);
-        break;
-    default:
-        break;
-    }
-
-    if (entry) {
-        entry->parse(die, *this);
-        add_entry(decl_file, decl_line, std::move(entry));
-    }
-}
-
-void cu_parser::parse_function(const dw::die &die, const namespace_list &namespaces)
-{
-    std::string name;
-    std::string decl_file;
-    int decl_line = 0;
-
-    if (auto it = die.find(dw::attribute_t::name); it != die.attributes().end()) {
-        name = it->get<std::string>();
-    }
-    if (auto it = die.find(dw::attribute_t::decl_file); it != die.attributes().end()) {
-        decl_file = posixpath::normpath(src_files_[it->get<int>()]);
-    }
-    if (auto it = die.find(dw::attribute_t::decl_line); it != die.attributes().end()) {
-        decl_line = it->get<int>();
-    }
-
-    if (name.empty() || decl_file.empty() || decl_line <= 0) {
-        return;
-    }
-
-    auto func = std::make_unique<function_t>(namespaces);
-    func->parse(die, *this);
-    add_entry(decl_file, decl_line, std::move(func));
 }
 
 void cu_parser::add_entry(std::string file, std::size_t line, std::unique_ptr<entry> entry) const
