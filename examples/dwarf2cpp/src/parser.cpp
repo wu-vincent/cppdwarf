@@ -187,6 +187,10 @@ void cu_parser::parse_type(const dw::die &die, const namespace_list &namespaces)
     switch (die.tag()) {
     case dw::tag::typedef_:
         entry = std::make_unique<typedef_t>(namespaces);
+        break;
+    case dw::tag::enumeration_type:
+        entry = std::make_unique<enum_t>(namespaces);
+        break;
     default:
         // TODO: parse types such as struct, class, union, enum here
         break;
@@ -220,7 +224,6 @@ void cu_parser::parse_function(const dw::die &die, const namespace_list &namespa
     auto func = std::make_unique<function_t>(namespaces);
     func->parse(die, *this);
     add_entry(decl_file, decl_line, std::move(func));
-    // TODO: parse non-member function here
 }
 
 void cu_parser::add_entry(std::string file, std::size_t line, std::unique_ptr<entry> entry) const

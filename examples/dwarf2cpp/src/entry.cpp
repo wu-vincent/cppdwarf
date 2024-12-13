@@ -94,3 +94,39 @@ std::string typedef_t::to_source() const
 {
     return "using " + name_ + " = " + type_ + ";";
 }
+
+void enum_t::parse(const dw::die &die, cu_parser &parser)
+{
+    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
+        name_ = it->get<std::string>();
+    }
+    if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
+        const auto type = it->get<dw::die>();
+        parser.parse_type(type, namespaces());
+        base_type_ = parser.get_type(type.offset());
+    }
+    for (const auto &child : die) {
+        if (child.tag() != dw::tag::enumerator) {
+            continue;
+        }
+        enumerator_t enumerator;
+        enumerator.name = child.attributes().at(dw::attribute_t::name).get<std::string>();
+        enumerator.value = child.attributes().at(dw::attribute_t::const_value).get<std::int64_t>();
+        enumerators_.push_back(enumerator);
+    }
+}
+
+std::string enum_t::to_source() const
+{
+    std::stringstream ss;
+    ss << "enum class " << name_;
+    if (!base_type_.empty()) {
+        ss << " : " << base_type_;
+    }
+    ss << " {\n";
+    for (const auto &[name, value] : enumerators_) {
+        ss << "    " << name << " = " << value << ",\n";
+    }
+    ss << "};";
+    return ss.str();
+}

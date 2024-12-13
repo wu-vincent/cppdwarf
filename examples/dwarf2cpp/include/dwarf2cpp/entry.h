@@ -63,3 +63,19 @@ private:
     std::string name_;
     std::string type_{"<bad typedef>"};
 };
+
+class enum_t : public entry {
+public:
+    struct enumerator_t {
+        std::string name;
+        std::int64_t value;
+    };
+    using entry::entry;
+    void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] std::string to_source() const override;
+
+private:
+    std::string name_;
+    std::string base_type_;
+    std::vector<enumerator_t> enumerators_;
+};

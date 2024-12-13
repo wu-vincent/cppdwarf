@@ -155,6 +155,12 @@ template <>
     return static_cast<int>(get_integer());
 }
 
+template <>
+[[nodiscard]] inline std::int64_t attribute::get<std::int64_t>() const
+{
+    return get_integer();
+}
+
 inline std::ostream &operator<<(std::ostream &os, const attribute &attr)
 {
     os << "attr: " << attr.name() << ", form: " << attr.form();
