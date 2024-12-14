@@ -19,10 +19,6 @@ void debug_parser::parse()
         }
         base_dir_ = posixpath::commonpath({cu_base_dir, base_dir_});
         i++;
-
-        if (i >= 10) {
-            break;
-        }
     }
 }
 
