@@ -34,6 +34,10 @@ def process_file(args):
         "std::basic_string<char, std::char_traits<char>, std::allocator<char> >",
         "std::string",
     )
+    content = content.replace(
+        "std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<long long, std::ratio<1L, 1000000000L> > >",
+        "std::chrono::steady_clock::time_point",
+    )
 
     # Regex to match and replace complex types in std::unique_ptr with default_delete
     pattern = r"std::unique_ptr<(.+?),\s*std::default_delete<\1\s*>\s*>"
@@ -65,14 +69,6 @@ def process_file(args):
         r"std::equal_to<\1\s*>,\s*std::allocator<\1\s*>\s*>"
     )
     content = recursive_sub(pattern, r"std::unordered_set<\1>", content)
-
-    # Replace basic types with more explicit types
-    content = content.replace("unsigned char", "std::uint8_t")
-    content = content.replace("unsigned short", "std::uint16_t")
-    content = content.replace("unsigned int", "std::uint32_t")
-    content = content.replace("unsigned long", "std::size_t")
-    content = content.replace("short", "std::int16_t")
-    content = content.replace("long", "std::int64_t")
 
     # Calculate relative path
     relative_path = file_path.relative_to(input_path)
