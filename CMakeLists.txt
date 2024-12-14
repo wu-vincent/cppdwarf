@@ -24,3 +24,4 @@ target_include_directories(cppdwarf INTERFACE
 target_link_libraries(cppdwarf INTERFACE libdwarf::libdwarf)
 
 add_subdirectory(examples/dwarf2cpp)
+add_subdirectory(examples/file2types)
