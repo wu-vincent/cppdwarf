@@ -215,7 +215,11 @@ void cu_parser::parse_children(const dw::die &die, namespace_list &namespaces) /
         std::string decl_file;
         int decl_line = 0;
         if (auto it = child.find(dw::attribute_t::decl_file); it != child.attributes().end()) {
-            decl_file = posixpath::normpath(src_files_[it->get<int>()]);
+            int file_index = it->get<int>();
+            if (cu_.version() < 5) {
+                file_index -= 1;
+            }
+            decl_file = src_files_.at(file_index);
         }
         if (auto it = child.find(dw::attribute_t::decl_line); it != child.attributes().end()) {
             decl_line = it->get<int>();
