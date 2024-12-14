@@ -344,7 +344,7 @@ std::string struct_t::to_source() const
         }
     }
     ss << "};\n";
-    if (byte_size.has_value()) {
+    if (!name_.empty() && byte_size.has_value()) {
         ss << "static_assert(sizeof(" << name_ << ") == " << byte_size.value() << ");\n";
     }
     return ss.str();
