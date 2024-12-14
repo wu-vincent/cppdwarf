@@ -11,6 +11,12 @@ namespace dw = cppdwarf;
 
 class cu_parser;
 
+struct type_t {
+    std::vector<std::string> prefixes{"void"};
+    std::vector<std::string> suffixes;
+    [[nodiscard]] std::string describe(const std::string &name) const;
+};
+
 class entry {
 public:
     using namespace_list = std::vector<std::string>;
@@ -47,7 +53,7 @@ public:
 
 private:
     std::string name_;
-    std::string type_{"<check>"};
+    type_t type_;
     bool is_artificial_{false};
 };
 
@@ -67,7 +73,7 @@ public:
 private:
     std::string name_;
     std::string linkage_name_;
-    std::string return_type_{"void"};
+    type_t return_type_;
     std::vector<std::unique_ptr<parameter_t>> parameters_;
     bool is_const_{false};
     bool is_member_{false};
@@ -88,7 +94,7 @@ public:
 
 private:
     std::string name_;
-    std::string type_{"<check>"};
+    type_t type_;
     std::optional<std::size_t> member_location_;
     std::optional<dw::access> access_;
     bool is_static{false};
@@ -107,7 +113,7 @@ public:
 
 private:
     std::string name_;
-    std::string type_{"<check>"};
+    type_t type_;
     std::optional<dw::access> access_;
 };
 
@@ -127,7 +133,7 @@ public:
 
 private:
     std::string name_;
-    std::string base_type_;
+    std::optional<type_t> base_type_;
     std::vector<enumerator_t> enumerators_;
     std::optional<dw::access> access_;
 };
@@ -149,7 +155,7 @@ private:
     bool is_class_;
     std::map<std::size_t, std::unique_ptr<entry>> members_;
     std::optional<std::size_t> byte_size;
-    std::vector<std::pair<dw::access, std::string>> base_classes_;
+    std::vector<std::pair<dw::access, type_t>> base_classes_;
     std::optional<dw::access> access_;
 };
 

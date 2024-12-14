@@ -11,14 +11,17 @@ void debug_parser::parse()
     int i = 0;
     for (auto &cu : dbg_) {
         cu_parser parser(cu, *this);
-        spdlog::info("parsing {}", parser.name());
+        spdlog::info("[{:<4}] parsing {}", ++i, parser.name());
         parser.parse();
         auto cu_base_dir = parser.base_dir();
         if (base_dir_.empty()) {
             base_dir_ = cu_base_dir;
         }
         base_dir_ = posixpath::commonpath({cu_base_dir, base_dir_});
-        i++;
+
+        // if (i >= 10) {
+        //     break;
+        // }
     }
 }
 
@@ -45,15 +48,15 @@ void cu_parser::parse()
     parse_children(cu_.die(), parents);
 }
 
-std::string cu_parser::get_type(const dw::die &die)
+type_t cu_parser::get_type(const dw::die &die)
 {
-    auto it = type_info_.find(die.offset());
-    if (it == type_info_.end()) {
+    auto it = known_types_.find(die.offset());
+    if (it == known_types_.end()) {
         std::unique_ptr<dw::die> type;
-        std::string type_name = "void";
+        type_t new_type;
         if (auto attr = die.find(dw::attribute_t::type); attr != die.attributes().end()) {
             type = attr->get<std::unique_ptr<dw::die>>();
-            type_name = get_type(*type);
+            new_type = get_type(*type);
         }
 
         switch (die.tag()) {
@@ -72,36 +75,36 @@ std::string cu_parser::get_type(const dw::die &die)
                     break;
                 }
             }
-            type_name += "[" + std::to_string(array_size) + "]";
+            new_type.suffixes.emplace_back("[" + std::to_string(array_size) + "]");
             break;
         }
         case dw::tag::pointer_type: {
-            type_name += "*";
+            new_type.prefixes.emplace_back("*");
             break;
         }
         case dw::tag::reference_type: {
-            type_name += "&";
+            new_type.prefixes.emplace_back("&");
             break;
         }
         case dw::tag::rvalue_reference_type: {
-            type_name += "&&";
+            new_type.prefixes.emplace_back("&&");
             break;
         }
         case dw::tag::const_type: {
-            type_name = "const " + type_name;
+            new_type.prefixes.emplace_back("const");
             break;
         }
         case dw::tag::atomic_type: {
-            type_name = "_Atomic " + type_name;
+            new_type.prefixes.insert(new_type.prefixes.begin(), "_Atomic");
             break;
         }
         case dw::tag::restrict_type: {
-            type_name = "restrict " + type_name;
+            new_type.prefixes.insert(new_type.prefixes.begin(), "restrict");
             break;
         }
         case dw::tag::ptr_to_member_type: {
             auto containing_type = die.attributes().at(dw::attribute_t::containing_type).get<dw::die>();
-            type_name += " " + get_type(containing_type) + "::" + "*";
+            new_type.prefixes.emplace_back(" " + get_type(containing_type).describe("") + "::" + "*");
             break;
         }
         case dw::tag::subroutine_type: {
@@ -110,19 +113,19 @@ std::string cu_parser::get_type(const dw::die &die)
         default: {
             std::stringstream ss;
             ss << "<" << die.tag() << ">";
-            type_name = ss.str();
+            new_type.prefixes.emplace_back(ss.str());
             break;
         }
         }
-        type_info_[die.offset()] = type_name;
+        known_types_[die.offset()] = new_type;
     }
-    return type_info_.at(die.offset());
+    return known_types_.at(die.offset());
 }
 
 void cu_parser::parse_types(const dw::die &die, namespace_list &parents) // NOLINT(*-no-recursion)
 {
     for (const auto &child : die) {
-        if (type_info_.find(child.offset()) != type_info_.end()) {
+        if (known_types_.find(child.offset()) != known_types_.end()) {
             continue;
         }
 
@@ -148,21 +151,21 @@ void cu_parser::parse_types(const dw::die &die, namespace_list &parents) // NOLI
             if (name.empty()) {
                 name = "void";
             }
-            type_info_[child.offset()] = get_qualified_name(parents, name);
+            known_types_[child.offset()] = {{get_qualified_name(parents, name)}};
             break;
         }
         case dw::tag::typedef_: {
             if (name.empty()) {
                 throw std::runtime_error("invalid typedef");
             }
-            type_info_[child.offset()] = get_qualified_name(parents, name);
+            known_types_[child.offset()] = {{get_qualified_name(parents, name)}};
             break;
         }
         case dw::tag::unspecified_type: {
             if (name.empty()) {
                 throw std::runtime_error("invalid unspecified type");
             }
-            type_info_[child.offset()] = get_qualified_name(parents, name);
+            known_types_[child.offset()] = {{get_qualified_name(parents, name)}};
             break;
         }
         case dw::tag::class_type:
@@ -170,10 +173,10 @@ void cu_parser::parse_types(const dw::die &die, namespace_list &parents) // NOLI
         case dw::tag::union_type:
         case dw::tag::enumeration_type: {
             if (!name.empty()) {
-                type_info_[child.offset()] = get_qualified_name(parents, name);
+                known_types_[child.offset()] = {{get_qualified_name(parents, name)}};
             }
             else {
-                type_info_[child.offset()] = "<unnamed>";
+                known_types_[child.offset()] = {{"<unnamed>"}};
             }
             parents.push_back(name);
             parse_types(child, parents);

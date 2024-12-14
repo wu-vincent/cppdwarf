@@ -28,6 +28,19 @@ std::string to_string(dw::access a)
 }
 } // namespace
 
+std::string type_t::describe(const std::string &name) const
+{
+    std::stringstream ss;
+    for (const auto &prefix : prefixes) {
+        ss << prefix << " ";
+    }
+    ss << name;
+    for (const auto &suffix : suffixes) {
+        ss << " " << suffix;
+    }
+    return ss.str();
+}
+
 void parameter_t::parse(const dw::die &die, cu_parser &parser)
 {
     if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
@@ -44,7 +57,7 @@ void parameter_t::parse(const dw::die &die, cu_parser &parser)
 
 std::string parameter_t::to_source() const
 {
-    return type_ + " " + name_;
+    return type_.describe(name_);
 }
 
 void function_t::parse(const dw::die &die, cu_parser &parser)
@@ -110,7 +123,7 @@ std::string function_t::to_source() const
         ss << "virtual ";
     }
     if (!linkage_name_.empty() && !starts_with(name_, "operator ")) {
-        ss << return_type_ << " ";
+        ss << return_type_.describe("");
     }
     if (is_explicit_) {
         ss << "explicit ";
@@ -162,15 +175,15 @@ std::string field_t::to_source() const
     if (is_static) {
         ss << "static ";
     }
-    ss << type_ << " " << name_;
+    ss << type_.describe(name_) << " ";
     if (default_value_.has_value()) {
         ss << " = ";
-        if (ends_with(type_, "float")) {
+        if (std::find(type_.prefixes.begin(), type_.prefixes.end(), "float") != type_.prefixes.end()) {
             auto value = static_cast<std::int32_t>(default_value_.value());
             constexpr auto max_precision{std::numeric_limits<float>::digits10 + 1};
             ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<float *>(&value);
         }
-        else if (ends_with(type_, "double")) {
+        else if (std::find(type_.prefixes.begin(), type_.prefixes.end(), "double") != type_.prefixes.end()) {
             auto value = default_value_.value();
             constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
             ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);
@@ -203,7 +216,7 @@ void typedef_t::parse(const dw::die &die, cu_parser &parser)
 
 std::string typedef_t::to_source() const
 {
-    return "using " + name_ + " = " + type_ + ";";
+    return "using " + name_ + " = " + type_.describe("") + ";";
 }
 
 void enum_t::parse(const dw::die &die, cu_parser &parser)
@@ -232,8 +245,8 @@ std::string enum_t::to_source() const
 {
     std::stringstream ss;
     ss << "enum class " << name_;
-    if (!base_type_.empty()) {
-        ss << " : " << base_type_;
+    if (!base_type_.has_value()) {
+        ss << " : " << base_type_.value().describe("");
     }
     ss << " {\n";
     for (const auto &[name, value] : enumerators_) {
@@ -321,7 +334,7 @@ std::string struct_t::to_source() const
             if (access != default_access) {
                 ss << to_string(access) << " ";
             }
-            ss << base;
+            ss << base.describe("");
         }
     }
     ss << " {\n";

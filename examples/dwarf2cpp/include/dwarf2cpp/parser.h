@@ -57,7 +57,7 @@ public:
         return base_dir_;
     }
 
-    [[nodiscard]] std::string get_type(const dw::die &die);
+    [[nodiscard]] type_t get_type(const dw::die &die);
 
 private:
     void parse_types(const dw::die &die, namespace_list &parents);
@@ -94,6 +94,6 @@ private:
     std::string name_;
     std::string base_dir_;
     std::vector<std::string> src_files_;
-    std::unordered_map<std::size_t, std::string> type_info_{};
+    std::unordered_map<std::size_t, type_t> known_types_{};
     debug_parser &dbg_parser_;
 };
