@@ -146,7 +146,9 @@ template <>
     if (dwarf_formstring(attr_, &value, &error) != DW_DLV_OK) {
         throw type_error("dwarf_formstring failed!");
     }
-    return value;
+    std::string result(value);
+    dwarf_dealloc(dbg_, value, DW_DLA_STRING);
+    return result;
 }
 
 template <>
