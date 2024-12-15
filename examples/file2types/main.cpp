@@ -10,9 +10,7 @@
 namespace dw = cppdwarf;
 namespace fs = std::filesystem;
 
-using file_entry_storage = std::unordered_map<std::string, std::unordered_set<std::string>>;
-
-nlohmann::json result;
+std::unordered_map<std::string, std::unordered_set<nlohmann::json>> result;
 
 std::string join(const std::vector<std::string> &strings, const std::string &delimiter)
 {
@@ -38,10 +36,11 @@ void parse(const dw::die &die, std::vector<std::string> &parents, const std::vec
         switch (tag) {
         case dw::tag::namespace_: {
             if (name.empty()) {
+                // Assign a special name for anonymous namespaces
                 name = "__anonymous_namespace__";
             }
             parents.push_back(name);
-            parse(child, parents, src_files);
+            parse(child, parents, src_files); // Recursive parsing of namespace
             parents.pop_back();
             break;
         }
@@ -52,7 +51,7 @@ void parse(const dw::die &die, std::vector<std::string> &parents, const std::vec
             std::string decl_file;
             int decl_line = 0;
             if (auto it = child.find(dw::attribute_t::decl_file); it != child.attributes().end()) {
-                decl_file = src_files.at(it->get<int>());
+                decl_file = src_files.at(it->get<int>()); // Map file index to file name
             }
             if (auto it = child.find(dw::attribute_t::decl_line); it != child.attributes().end()) {
                 decl_line = it->get<int>();
@@ -60,11 +59,11 @@ void parse(const dw::die &die, std::vector<std::string> &parents, const std::vec
 
             if (!name.empty() && !decl_file.empty() && decl_line > 0) {
                 parents.push_back(name);
-                result[decl_file].push_back({
+                result[decl_file].insert(nlohmann::json{
                     {"line", decl_line},
                     {"name", join(parents, "::")},
                 });
-                parse(child, parents, src_files);
+                parse(child, parents, src_files); // Recursive parsing of children
                 parents.pop_back();
             }
             break;
@@ -90,18 +89,39 @@ int main(int argc, char *argv[])
     }
 
     auto path = parser.get<std::string>("path");
-    auto debug = dw::debug(path);
+    auto debug = dw::debug(path); // Load the DWARF debug symbols from the file
+
+    spdlog::info("Parsing type units");
+    for (const auto &tu : debug.type_units()) {
+        auto &tu_die = tu.die();
+        std::vector<std::string> parents;
+        auto src_files = tu_die.src_files();
+        if (tu.version() < 5) {
+            src_files.insert(src_files.begin(), "placeholder_do_not_use");
+        }
+        parse(tu_die, parents, src_files);
+    }
+
+    spdlog::info("Parsing compilation units");
     for (const auto &cu : debug) {
         auto &cu_die = cu.die();
         std::string die_name = cu_die.find(dw::attribute_t::name)->get<std::string>();
         spdlog::info("{}", die_name);
         std::vector<std::string> parents;
-        parse(cu_die, parents, cu_die.src_files());
+        auto src_files = cu_die.src_files();
+        if (cu.version() < 5) {
+            src_files.insert(src_files.begin(), "placeholder_do_not_use");
+        }
+        parse(cu_die, parents, src_files);
     }
 
+    nlohmann::json json;
+    for (const auto &[key, value] : result) {
+        json[key] = value;
+    }
     std::ofstream output_file("output.json");
     if (output_file.is_open()) {
-        output_file << result.dump(4); // Pretty print with indentation of 4 spaces
+        output_file << json.dump(4);
         output_file.close();
         spdlog::info("JSON result successfully written to 'output.json'");
     }

@@ -64,7 +64,7 @@ private:
         using pointer = T *;
         using reference = T &;
 
-        explicit iterator_base(Dwarf_Debug dbg) : dbg_(dbg), done_(false)
+        explicit iterator_base(Dwarf_Debug dbg, bool is_info) : dbg_(dbg), is_info_(is_info), done_(false)
         {
             advance();
         }
@@ -112,34 +112,58 @@ private:
                 return;
             }
 
-            while (true) {
-                Dwarf_Die cu_die = nullptr;
-                Dwarf_Unsigned cu_header_length = 0;
-                Dwarf_Unsigned abbrev_offset = 0;
-                Dwarf_Half version_stamp = 0, address_size = 0, offset_size = 0, extension_size = 0;
-                Dwarf_Sig8 signature;
-                Dwarf_Unsigned typeoffset = 0;
-                Dwarf_Half header_cu_type = 0;
-                Dwarf_Error error = nullptr;
-                int res = dwarf_next_cu_header_e(dbg_, is_info_, &cu_die, &cu_header_length, &version_stamp,
-                                                 &abbrev_offset, &address_size, &offset_size, &extension_size,
-                                                 &signature, &typeoffset, &next_cu_header_, &header_cu_type, &error);
-                if (res == DW_DLV_ERROR) {
-                    throw invalid_iterator("dwarf_next_cu_header_e failed!");
-                }
-                if (res == DW_DLV_NO_ENTRY) {
-                    if (is_info_) {
-                        is_info_ = false; // Switch to .debug_types
-                        continue;
-                    }
-                    done_ = true; // No more entries
-                    return;
-                }
-
-                cu_ = std::make_unique<T>(dbg_, cu_die, cu_header_length, version_stamp, abbrev_offset, address_size);
-                break;
+            Dwarf_Die cu_die = nullptr;
+            Dwarf_Unsigned cu_header_length = 0;
+            Dwarf_Unsigned abbrev_offset = 0;
+            Dwarf_Half version_stamp = 0, address_size = 0, offset_size = 0, extension_size = 0;
+            Dwarf_Sig8 signature;
+            Dwarf_Unsigned typeoffset = 0;
+            Dwarf_Half header_cu_type = 0;
+            Dwarf_Error error = nullptr;
+            int res = dwarf_next_cu_header_e(dbg_, is_info_, &cu_die, &cu_header_length, &version_stamp, &abbrev_offset,
+                                             &address_size, &offset_size, &extension_size, &signature, &typeoffset,
+                                             &next_cu_header_, &header_cu_type, &error);
+            if (res == DW_DLV_ERROR) {
+                throw invalid_iterator("dwarf_next_cu_header_e failed!");
             }
+            if (res == DW_DLV_NO_ENTRY) {
+                done_ = true; // No more entries
+                return;
+            }
+
+            cu_ = std::make_unique<T>(dbg_, cu_die, cu_header_length, version_stamp, abbrev_offset, address_size);
         }
+    };
+
+    class type_unit_list {
+    public:
+        explicit type_unit_list(Dwarf_Debug dbg) : dbg_(dbg) {}
+
+        using iterator = iterator_base<compilation_unit>;
+        using const_iterator = iterator_base<const compilation_unit>;
+
+        iterator begin()
+        {
+            return iterator(dbg_, false);
+        }
+
+        iterator end()
+        {
+            return {};
+        }
+
+        [[nodiscard]] const_iterator begin() const
+        {
+            return const_iterator(dbg_, false);
+        }
+
+        [[nodiscard]] const_iterator end() const
+        {
+            return {};
+        }
+
+    private:
+        Dwarf_Debug dbg_;
     };
 
 public:
@@ -148,7 +172,7 @@ public:
 
     iterator begin()
     {
-        return iterator(dbg_);
+        return iterator(dbg_, true);
     }
 
     iterator end()
@@ -158,12 +182,17 @@ public:
 
     [[nodiscard]] const_iterator begin() const
     {
-        return const_iterator(dbg_);
+        return const_iterator(dbg_, true);
     }
 
     [[nodiscard]] const_iterator end() const
     {
         return {};
+    }
+
+    [[nodiscard]] type_unit_list type_units() const
+    {
+        return type_unit_list(dbg_);
     }
 
 private:
