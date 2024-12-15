@@ -3,12 +3,16 @@
 #include <utility>
 
 #include <cppdwarf/cppdwarf.hpp>
+#include <spdlog/fmt/ostr.h>
 #include <spdlog/fmt/ranges.h>
 
 #include "dwarf2cpp/posixpath.hpp"
 #include "dwarf2cpp/source_file.h"
 
 namespace dw = cppdwarf;
+
+template <>
+struct fmt::formatter<dw::die> : ostream_formatter {};
 
 class debug_parser {
 public:

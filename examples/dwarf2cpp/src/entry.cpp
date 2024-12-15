@@ -9,9 +9,6 @@
 #include "dwarf2cpp/algorithm.hpp"
 #include "dwarf2cpp/parser.h"
 
-template <>
-struct fmt::formatter<dw::die> : ostream_formatter {};
-
 namespace {
 std::string to_string(dw::access a)
 {
