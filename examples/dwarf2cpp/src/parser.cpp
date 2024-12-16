@@ -3,31 +3,29 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
 
-void debug_parser::parse()
+const debug_parser::result &debug_parser::parse()
 {
     int i = 0;
     for (auto &cu : dbg_) {
-        cu_parser parser(cu, *this);
-        spdlog::info("[{:<4}] parsing {}", ++i, parser.name());
-        parser.parse();
-        auto cu_base_dir = parser.base_dir();
-        if (base_dir_.empty()) {
-            base_dir_ = cu_base_dir;
-        }
-        base_dir_ = posixpath::commonpath({cu_base_dir, base_dir_});
+        auto &cu_die = cu.die();
+        auto name = cu_die.find(dw::attribute_t::name)->get<std::string>();
+        auto comp_dir = cu_die.find(dw::attribute_t::comp_dir)->get<std::string>();
+        auto base_dir = posixpath::commonpath({name, comp_dir});
 
-        // if (i >= 10) {
-        //     break;
-        // }
+        spdlog::info("[{:<4}] parsing {}", ++i, name);
+        cu_parser parser(cu, *this);
+        parser.parse();
+        if (result_.base_dir.empty()) {
+            result_.base_dir = base_dir;
+        }
+        result_.base_dir = posixpath::commonpath({base_dir, result_.base_dir});
     }
+    return result_;
 }
 
 cu_parser::cu_parser(dw::compilation_unit &cu, debug_parser &dbg_parser) : cu_(cu), dbg_parser_(dbg_parser)
 {
     auto &cu_die = cu.die();
-    name_ = cu_die.find(dw::attribute_t::name)->get<std::string>();
-    auto comp_dir = cu_die.find(dw::attribute_t::comp_dir)->get<std::string>();
-    base_dir_ = posixpath::commonpath({name_, comp_dir});
     src_files_ = cu_die.src_files();
 }
 
@@ -37,9 +35,6 @@ void cu_parser::parse()
 
     // first pass: parse all types with names
     parse_types(cu_.die(), parents);
-    // for (const auto &[offset, type] : type_info_) {
-    //     spdlog::info("{} {}", offset, type);
-    // }
 
     // second pass: parse all functions and classes
     parse_children(cu_.die(), parents);

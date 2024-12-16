@@ -30,9 +30,9 @@ int main(int argc, char *argv[])
     auto path = parser.get<std::string>("path");
     auto debug = dw::debug(path);
     auto dbg_parser = debug_parser(debug);
-    dbg_parser.parse();
-    auto base_dir = dbg_parser.base_dir();
-    for (const auto &[filename, content] : dbg_parser.result()) {
+    auto &result = dbg_parser.parse();
+    auto base_dir = result.base_dir;
+    for (const auto &[filename, content] : result.files) {
         if (posixpath::commonpath({filename, base_dir}) != base_dir) {
             continue;
         }

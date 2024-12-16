@@ -16,19 +16,14 @@ struct fmt::formatter<dw::die> : ostream_formatter {};
 
 class debug_parser {
 public:
+    struct result {
+        std::string base_dir;
+        std::unordered_map<std::string, source_file> files;
+    };
+
     explicit debug_parser(dw::debug &dbg) : dbg_(dbg) {}
 
-    void parse();
-
-    [[nodiscard]] std::string base_dir() const
-    {
-        return base_dir_;
-    }
-
-    [[nodiscard]] const std::unordered_map<std::string, source_file> &result() const
-    {
-        return result_;
-    }
+    const result &parse();
 
 private:
     friend class cu_parser;
@@ -36,12 +31,11 @@ private:
     void add_entry(std::string file, std::size_t line, std::unique_ptr<entry> entry)
     {
         file = posixpath::normpath(file);
-        result_[file].add(line, std::move(entry));
+        result_.files[file].add(line, std::move(entry));
     }
 
     dw::debug &dbg_;
-    std::string base_dir_;
-    std::unordered_map<std::string, source_file> result_{};
+    result result_;
 };
 
 class cu_parser {
@@ -50,16 +44,6 @@ class cu_parser {
 public:
     cu_parser(dw::compilation_unit &cu, debug_parser &dbg_parser);
     void parse();
-
-    [[nodiscard]] std::string name() const
-    {
-        return name_;
-    }
-
-    [[nodiscard]] std::string base_dir() const
-    {
-        return base_dir_;
-    }
 
     [[nodiscard]] type_t get_type(const dw::die &die);
 
@@ -95,8 +79,6 @@ private:
 
 private:
     dw::compilation_unit &cu_;
-    std::string name_;
-    std::string base_dir_;
     std::vector<std::string> src_files_;
     std::unordered_map<std::size_t, type_t> known_types_{};
     debug_parser &dbg_parser_;
