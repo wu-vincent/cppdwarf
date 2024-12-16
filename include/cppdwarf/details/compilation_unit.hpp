@@ -6,10 +6,10 @@ namespace cppdwarf {
 
 class compilation_unit {
 public:
-    compilation_unit(Dwarf_Debug dbg, Dwarf_Die die, std::size_t cu_header_length, int version_stamp,
+    compilation_unit(Dwarf_Debug dbg, Dwarf_Die die, bool is_info, std::size_t cu_header_length, int version_stamp,
                      std::size_t abbrev_offset, int address_size)
-        : die_(dbg, die), cu_header_length_(cu_header_length), version_stamp_(version_stamp),
-          abbrev_offset_(abbrev_offset), address_size_(address_size)
+        : die_(dbg, die, is_info), is_info_(is_info), cu_header_length_(cu_header_length),
+          version_stamp_(version_stamp), abbrev_offset_(abbrev_offset), address_size_(address_size)
     {
     }
 
@@ -40,6 +40,7 @@ public:
 
 private:
     cppdwarf::die die_;
+    bool is_info_;
     std::size_t cu_header_length_;
     int version_stamp_;
     std::size_t abbrev_offset_;
