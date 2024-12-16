@@ -3,9 +3,6 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
 
-template <>
-struct fmt::formatter<dw::die> : ostream_formatter {};
-
 void debug_parser::parse()
 {
     int i = 0;
@@ -248,6 +245,10 @@ void cu_parser::parse_children(const dw::die &die, namespace_list &namespaces) /
         }
         case dw::tag::subprogram: {
             entry = std::make_unique<function_t>(false, namespaces);
+            break;
+        }
+        case dw::tag::typedef_: {
+            entry = std::make_unique<typedef_t>(namespaces);
             break;
         }
         default:

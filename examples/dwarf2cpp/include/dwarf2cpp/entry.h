@@ -153,7 +153,7 @@ public:
 private:
     std::string name_;
     bool is_class_;
-    std::map<std::size_t, std::unique_ptr<entry>> members_;
+    std::map<std::size_t, std::vector<std::unique_ptr<entry>>> members_;
     std::optional<std::size_t> byte_size;
     std::vector<std::pair<dw::access, type_t>> base_classes_;
     std::optional<dw::access> access_;

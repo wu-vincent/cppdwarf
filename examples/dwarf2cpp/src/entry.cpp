@@ -310,7 +310,7 @@ void struct_t::parse(const dw::die &die, cu_parser &parser)
 
         if (entry && decl_line > 0) {
             entry->parse(child, parser);
-            members_[decl_line] = std::move(entry);
+            members_[decl_line].emplace_back(std::move(entry));
         }
     }
 }
@@ -338,19 +338,21 @@ std::string struct_t::to_source() const
 
     auto last_access = default_access;
     for (const auto &[decl_line, member] : members_) {
-        auto current_access = member->access().value_or(default_access);
-        if (current_access != last_access) {
-            ss << to_string(current_access) << ":\n";
-            last_access = current_access;
-        }
+        for (auto &m : member) {
+            auto current_access = m->access().value_or(default_access);
+            if (current_access != last_access) {
+                ss << to_string(current_access) << ":\n";
+                last_access = current_access;
+            }
 
 #ifndef NDEBUG
-        // ss << "// Line " << line << "\n";
+            // ss << "// Line " << line << "\n";
 #endif
-        std::stringstream ss2(member->to_source());
-        std::string line;
-        while (std::getline(ss2, line)) {
-            ss << "    " << line << "\n";
+            std::stringstream ss2(m->to_source());
+            std::string line;
+            while (std::getline(ss2, line)) {
+                ss << "    " << line << "\n";
+            }
         }
     }
     ss << "};\n";
