@@ -12,11 +12,13 @@
 namespace cppdwarf {
 
 class die {
+    using handle_t = std::unique_ptr<Dwarf_Die_s, decltype(&dwarf_dealloc_die)>;
+
 public:
     explicit die(Dwarf_Debug dbg, Dwarf_Die die, bool is_info)
-        : dbg_(dbg), die_(die, dwarf_dealloc_die), is_info_(is_info)
+        : dbg_(dbg), handle_(die, dwarf_dealloc_die), is_info_(is_info)
     {
-        attributes_ = std::make_unique<attribute_list>(dbg_, die_.get());
+        attributes_ = std::make_unique<attribute_list>(dbg_, handle_.get());
     }
 
     die(const die &) = delete;
@@ -29,7 +31,7 @@ public:
     {
         Dwarf_Off offset = 0;
         Dwarf_Error error = nullptr;
-        int res = dwarf_dieoffset(die_.get(), &offset, &error);
+        int res = dwarf_dieoffset(handle_.get(), &offset, &error);
         if (res != DW_DLV_OK) {
             throw other_error("dwarf_dieoffset failed!");
         }
@@ -71,7 +73,7 @@ private:
             }
             Dwarf_Error error = nullptr;
             Dwarf_Die next_die = nullptr;
-            int result = dwarf_siblingof_c(current_die_->die_.get(), &next_die, &error);
+            int result = dwarf_siblingof_c(current_die_->handle_.get(), &next_die, &error);
             if (result == DW_DLV_NO_ENTRY) {
                 current_die_ = nullptr;
             }
@@ -114,7 +116,7 @@ public:
 
     iterator begin()
     {
-        return {dbg_, die_.get(), is_info_};
+        return {dbg_, handle_.get(), is_info_};
     }
 
     iterator end()
@@ -124,8 +126,9 @@ public:
 
     [[nodiscard]] const_iterator begin() const
     {
-        return {dbg_, die_.get(), is_info_};
+        return {dbg_, handle_.get(), is_info_};
     }
+
     [[nodiscard]] const_iterator end() const
     {
         return {dbg_, nullptr, is_info_};
@@ -135,7 +138,7 @@ public:
     {
         Dwarf_Half tag;
         Dwarf_Error error = nullptr;
-        int res = dwarf_tag(die_.get(), &tag, &error);
+        int res = dwarf_tag(handle_.get(), &tag, &error);
         if (res == DW_DLV_ERROR) {
             throw other_error("dwarf_tag failed!");
         }
@@ -152,7 +155,7 @@ public:
         char **srcfiles = nullptr;
         Dwarf_Signed count = 0;
         Dwarf_Error error = nullptr;
-        int res = dwarf_srcfiles(die_.get(), &srcfiles, &count, &error);
+        int res = dwarf_srcfiles(handle_.get(), &srcfiles, &count, &error);
         if (res != DW_DLV_OK) {
             throw other_error("dwarf_srcfiles failed!");
         }
@@ -183,7 +186,7 @@ public:
 
 private:
     Dwarf_Debug dbg_ = nullptr;
-    std::unique_ptr<Dwarf_Die_s, decltype(&dwarf_dealloc_die)> die_;
+    handle_t handle_;
     bool is_info_;
     std::unique_ptr<attribute_list> attributes_;
 };
