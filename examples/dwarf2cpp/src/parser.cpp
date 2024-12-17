@@ -67,36 +67,40 @@ type_t cu_parser::get_type(const dw::die &die) // NOLINT(*-no-recursion)
                     break;
                 }
             }
-            new_type.suffixes.emplace_back("[" + std::to_string(array_size) + "]");
+            new_type.after_name.emplace_back("[" + std::to_string(array_size) + "]");
             break;
         }
         case dw::tag::pointer_type: {
-            new_type.prefixes.emplace_back("*");
+            new_type.after_type.emplace_back("*");
             break;
         }
         case dw::tag::reference_type: {
-            new_type.prefixes.emplace_back("&");
+            new_type.after_type.emplace_back("&");
             break;
         }
         case dw::tag::rvalue_reference_type: {
-            new_type.prefixes.emplace_back("&&");
+            new_type.after_type.emplace_back("&&");
             break;
         }
         case dw::tag::const_type: {
-            new_type.prefixes.emplace_back("const");
+            new_type.after_type.emplace_back("const");
             break;
         }
         case dw::tag::atomic_type: {
-            new_type.prefixes.insert(new_type.prefixes.begin(), "_Atomic");
+            new_type.before_type.insert(new_type.before_type.begin(), "_Atomic");
             break;
         }
         case dw::tag::restrict_type: {
-            new_type.prefixes.insert(new_type.prefixes.begin(), "restrict");
+            new_type.before_type.insert(new_type.before_type.begin(), "restrict");
+            break;
+        }
+        case dw::tag::volatile_type: {
+            new_type.before_type.insert(new_type.before_type.begin(), "volatile");
             break;
         }
         case dw::tag::ptr_to_member_type: {
             auto containing_type = die.attributes().at(dw::attribute_t::containing_type)->get<dw::die>();
-            new_type.prefixes.emplace_back(" " + get_type(containing_type).describe("") + "::" + "*");
+            new_type.type = get_type(containing_type).describe("") + "::" + "*";
             break;
         }
         case dw::tag::subroutine_type: {
@@ -105,7 +109,7 @@ type_t cu_parser::get_type(const dw::die &die) // NOLINT(*-no-recursion)
         default: {
             std::stringstream ss;
             ss << "<" << die.tag() << ">";
-            new_type.prefixes.emplace_back(ss.str());
+            new_type.type = ss.str();
             break;
         }
         }
@@ -143,21 +147,21 @@ void cu_parser::parse_types(const dw::die &die, namespace_list &parents) // NOLI
             if (name.empty()) {
                 name = "void";
             }
-            known_types_[child.offset()] = {{get_qualified_name(parents, name)}};
+            known_types_[child.offset()] = {get_qualified_name(parents, name)};
             break;
         }
         case dw::tag::typedef_: {
             if (name.empty()) {
                 throw std::runtime_error("invalid typedef");
             }
-            known_types_[child.offset()] = {{get_qualified_name(parents, name)}};
+            known_types_[child.offset()] = {get_qualified_name(parents, name)};
             break;
         }
         case dw::tag::unspecified_type: {
             if (name.empty()) {
                 throw std::runtime_error("invalid unspecified type");
             }
-            known_types_[child.offset()] = {{get_qualified_name(parents, name)}};
+            known_types_[child.offset()] = {get_qualified_name(parents, name)};
             break;
         }
         case dw::tag::class_type:
@@ -165,10 +169,7 @@ void cu_parser::parse_types(const dw::die &die, namespace_list &parents) // NOLI
         case dw::tag::union_type:
         case dw::tag::enumeration_type: {
             if (!name.empty()) {
-                known_types_[child.offset()] = {{get_qualified_name(parents, name)}};
-            }
-            else {
-                known_types_[child.offset()] = {{"<unnamed>"}};
+                known_types_[child.offset()] = {get_qualified_name(parents, name)};
             }
             parents.push_back(name);
             parse_types(child, parents);

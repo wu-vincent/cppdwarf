@@ -28,12 +28,18 @@ std::string to_string(dw::access a)
 std::string type_t::describe(const std::string &name) const
 {
     std::stringstream ss;
-    for (const auto &prefix : prefixes) {
-        ss << prefix << " ";
+    for (const auto &str : before_type) {
+        ss << str << " ";
     }
-    ss << name;
-    for (const auto &suffix : suffixes) {
-        ss << " " << suffix;
+    ss << type;
+    for (const auto &str : after_type) {
+        ss << " " << str;
+    }
+    if (!name.empty()) {
+        ss << " " << name;
+    }
+    for (const auto &str : after_name) {
+        ss << str;
     }
     return ss.str();
 }
@@ -175,12 +181,12 @@ std::string field_t::to_source() const
     ss << type_.describe(name_) << " ";
     if (default_value_.has_value()) {
         ss << " = ";
-        if (std::find(type_.prefixes.begin(), type_.prefixes.end(), "float") != type_.prefixes.end()) {
+        if (type_.type == "float") {
             auto value = static_cast<std::int32_t>(default_value_.value());
             constexpr auto max_precision{std::numeric_limits<float>::digits10 + 1};
             ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<float *>(&value);
         }
-        else if (std::find(type_.prefixes.begin(), type_.prefixes.end(), "double") != type_.prefixes.end()) {
+        else if (type_.type == "double") {
             auto value = default_value_.value();
             constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
             ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);

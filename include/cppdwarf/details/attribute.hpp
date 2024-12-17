@@ -179,6 +179,17 @@ template <>
     return static_cast<std::uint64_t>(get_integer());
 }
 
+template <>
+[[nodiscard]] inline Dwarf_Sig8 attribute::get<Dwarf_Sig8>() const
+{
+    Dwarf_Sig8 signature;
+    Dwarf_Error error = nullptr;
+    if (dwarf_formsig8(handle_.get(), &signature, &error) != DW_DLV_OK) {
+        throw type_error("dwarf_formsig8 failed!");
+    }
+    return signature;
+}
+
 inline std::ostream &operator<<(std::ostream &os, const attribute &attr)
 {
     os << "attr: " << attr.name() << ", form: " << attr.form();

@@ -12,8 +12,10 @@ namespace dw = cppdwarf;
 class cu_parser;
 
 struct type_t {
-    std::vector<std::string> prefixes{"void"};
-    std::vector<std::string> suffixes;
+    std::string type = "void";
+    std::vector<std::string> before_type;
+    std::vector<std::string> after_type;
+    std::vector<std::string> after_name;
     [[nodiscard]] std::string describe(const std::string &name) const;
 };
 
