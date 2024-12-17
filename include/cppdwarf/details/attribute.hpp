@@ -3,8 +3,8 @@
 #include <libdwarf.h>
 
 #include <cppdwarf/details/attribute_t.hpp>
+#include <cppdwarf/details/enums.hpp>
 #include <cppdwarf/details/exceptions.hpp>
-#include <cppdwarf/details/form.hpp>
 
 namespace cppdwarf {
 

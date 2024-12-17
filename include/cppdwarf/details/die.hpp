@@ -7,7 +7,7 @@
 
 #include <cppdwarf/details/attribute.hpp>
 #include <cppdwarf/details/attribute_list.hpp>
-#include <cppdwarf/details/tag.hpp>
+#include <cppdwarf/details/enums.hpp>
 
 namespace cppdwarf {
 
