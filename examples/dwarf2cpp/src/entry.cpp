@@ -40,15 +40,15 @@ std::string type_t::describe(const std::string &name) const
 
 void parameter_t::parse(const dw::die &die, cu_parser &parser)
 {
-    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
-        name_ = it->get<std::string>();
+    if (die.attributes().contains(dw::attribute_t::name)) {
+        name_ = die.attributes().at(dw::attribute_t::name)->get<std::string>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
-        const auto type = it->get<dw::die>();
-        type_ = parser.get_type(it->get<dw::die>());
+    if (die.attributes().contains(dw::attribute_t::type)) {
+        const auto type = die.attributes().at(dw::attribute_t::type)->get<dw::die>();
+        type_ = parser.get_type(type);
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::artificial); it != die.attributes().end()) {
-        is_artificial_ = it->get<bool>();
+    if (die.attributes().contains(dw::attribute_t::artificial)) {
+        is_artificial_ = die.attributes().at(dw::attribute_t::artificial)->get<bool>();
     }
 }
 
@@ -59,9 +59,9 @@ std::string parameter_t::to_source() const
 
 void function_t::parse(const dw::die &die, cu_parser &parser)
 {
-    name_ = die.attributes().at(dw::attribute_t::name).get<std::string>();
-    if (const auto it = die.attributes().find(dw::attribute_t::linkage_name); it != die.attributes().end()) {
-        linkage_name_ = it->get<std::string>();
+    name_ = die.attributes().at(dw::attribute_t::name)->get<std::string>();
+    if (die.attributes().contains(dw::attribute_t::linkage_name)) {
+        linkage_name_ = die.attributes().at(dw::attribute_t::linkage_name)->get<std::string>();
         if (const char *demangled = llvm::itaniumDemangle(linkage_name_, true)) {
             std::string demangled_name = demangled;
             static const std::string const_str = "const";
@@ -70,18 +70,18 @@ void function_t::parse(const dw::die &die, cu_parser &parser)
             }
         }
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
-        const auto return_type = it->get<dw::die>();
-        return_type_ = parser.get_type(it->get<dw::die>());
+    if (die.attributes().contains(dw::attribute_t::type)) {
+        const auto return_type = die.attributes().at(dw::attribute_t::type)->get<dw::die>();
+        return_type_ = parser.get_type(return_type);
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::explicit_); it != die.attributes().end()) {
-        is_explicit_ = it->get<bool>();
+    if (die.attributes().contains(dw::attribute_t::explicit_)) {
+        is_explicit_ = die.attributes().at(dw::attribute_t::explicit_)->get<bool>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::virtuality); it != die.attributes().end()) {
-        virtuality_ = static_cast<dw::virtuality>(it->get<int>());
+    if (die.attributes().contains(dw::attribute_t::virtuality)) {
+        virtuality_ = static_cast<dw::virtuality>(die.attributes().at(dw::attribute_t::virtuality)->get<int>());
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
-        access_ = static_cast<dw::access>(it->get<int>());
+    if (die.attributes().contains(dw::attribute_t::accessibility)) {
+        access_ = static_cast<dw::access>(die.attributes().at(dw::attribute_t::accessibility)->get<int>());
     }
 
     int param_index = 0;
@@ -145,23 +145,23 @@ std::string function_t::to_source() const
 
 void field_t::parse(const dw::die &die, cu_parser &parser)
 {
-    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
-        name_ = it->get<std::string>();
+    if (die.attributes().contains(dw::attribute_t::name)) {
+        name_ = die.attributes().at(dw::attribute_t::name)->get<std::string>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
-        type_ = parser.get_type(it->get<dw::die>());
+    if (die.attributes().contains(dw::attribute_t::type)) {
+        type_ = parser.get_type(die.attributes().at(dw::attribute_t::type)->get<dw::die>());
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::data_member_location); it != die.attributes().end()) {
-        member_location_ = it->get<std::size_t>();
+    if (die.attributes().contains(dw::attribute_t::data_member_location)) {
+        member_location_ = die.attributes().at(dw::attribute_t::data_member_location)->get<std::size_t>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
-        access_ = static_cast<dw::access>(it->get<int>());
+    if (die.attributes().contains(dw::attribute_t::accessibility)) {
+        access_ = static_cast<dw::access>(die.attributes().at(dw::attribute_t::accessibility)->get<int>());
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::external); it != die.attributes().end()) {
-        is_static = it->get<bool>();
+    if (die.attributes().contains(dw::attribute_t::external)) {
+        is_static = die.attributes().at(dw::attribute_t::external)->get<bool>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::const_value); it != die.attributes().end()) {
-        default_value_ = it->get<std::int64_t>();
+    if (die.attributes().contains(dw::attribute_t::const_value)) {
+        default_value_ = die.attributes().at(dw::attribute_t::const_value)->get<std::int64_t>();
     }
     // TODO: handle anonymous struct here
 }
@@ -198,16 +198,17 @@ std::string field_t::to_source() const
 
 void typedef_t::parse(const dw::die &die, cu_parser &parser)
 {
-    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
-        name_ = it->get<std::string>();
+    if (die.attributes().contains(dw::attribute_t::name)) {
+        name_ = die.attributes().at(dw::attribute_t::name)->get<std::string>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
-        const auto type = it->get<dw::die>();
-        type_ = parser.get_type(it->get<dw::die>());
+    if (die.attributes().contains(dw::attribute_t::type)) {
+        const auto type = die.attributes().at(dw::attribute_t::type)->get<dw::die>();
+        type_ = parser.get_type(type);
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
-        access_ = static_cast<dw::access>(it->get<int>());
+    if (die.attributes().contains(dw::attribute_t::accessibility)) {
+        access_ = static_cast<dw::access>(die.attributes().at(dw::attribute_t::accessibility)->get<int>());
     }
+
     // TODO: handle anonymous struct here
 }
 
@@ -218,22 +219,22 @@ std::string typedef_t::to_source() const
 
 void enum_t::parse(const dw::die &die, cu_parser &parser)
 {
-    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
-        name_ = it->get<std::string>();
+    if (die.attributes().contains(dw::attribute_t::name)) {
+        name_ = die.attributes().at(dw::attribute_t::name)->get<std::string>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::type); it != die.attributes().end()) {
-        base_type_ = parser.get_type(it->get<dw::die>());
+    if (die.attributes().contains(dw::attribute_t::type)) {
+        base_type_ = parser.get_type(die.attributes().at(dw::attribute_t::type)->get<dw::die>());
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
-        access_ = static_cast<dw::access>(it->get<int>());
+    if (die.attributes().contains(dw::attribute_t::accessibility)) {
+        access_ = static_cast<dw::access>(die.attributes().at(dw::attribute_t::accessibility)->get<int>());
     }
     for (const auto &child : die) {
         if (child.tag() != dw::tag::enumerator) {
             continue;
         }
         enumerator_t enumerator;
-        enumerator.name = child.attributes().at(dw::attribute_t::name).get<std::string>();
-        enumerator.value = child.attributes().at(dw::attribute_t::const_value).get<std::int64_t>();
+        enumerator.name = child.attributes().at(dw::attribute_t::name)->get<std::string>();
+        enumerator.value = child.attributes().at(dw::attribute_t::const_value)->get<std::int64_t>();
         enumerators_.push_back(enumerator);
     }
 }
@@ -255,31 +256,30 @@ std::string enum_t::to_source() const
 
 void struct_t::parse(const dw::die &die, cu_parser &parser)
 {
-    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
-        name_ = it->get<std::string>();
+    if (die.attributes().contains(dw::attribute_t::name)) {
+        name_ = die.attributes().at(dw::attribute_t::name)->get<std::string>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::byte_size); it != die.attributes().end()) {
-        byte_size = it->get<std::size_t>();
+    if (die.attributes().contains(dw::attribute_t::byte_size)) {
+        byte_size = die.attributes().at(dw::attribute_t::byte_size)->get<std::size_t>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
-        access_ = static_cast<dw::access>(it->get<int>());
+    if (die.attributes().contains(dw::attribute_t::accessibility)) {
+        access_ = static_cast<dw::access>(die.attributes().at(dw::attribute_t::accessibility)->get<int>());
     }
 
     for (const auto &child : die) {
         std::unique_ptr<entry> entry;
         std::size_t decl_line = 0;
-        if (const auto it = child.attributes().find(dw::attribute_t::decl_line); it != child.attributes().end()) {
-            decl_line = it->get<std::size_t>();
+        if (child.attributes().contains(dw::attribute_t::decl_line)) {
+            decl_line = child.attributes().at(dw::attribute_t::decl_line)->get<std::size_t>();
         }
 
         switch (child.tag()) {
         case dw::tag::inheritance: {
             auto access = (is_class_ ? dw::access::private_ : dw::access::public_);
-            if (const auto it = child.attributes().find(dw::attribute_t::accessibility);
-                it != child.attributes().end()) {
-                access = static_cast<dw::access>(it->get<int>());
+            if (child.attributes().contains(dw::attribute_t::accessibility)) {
+                access = static_cast<dw::access>(child.attributes().at(dw::attribute_t::accessibility)->get<int>());
             }
-            auto type = parser.get_type(child.attributes().find(dw::attribute_t::type)->get<dw::die>());
+            auto type = parser.get_type(child.attributes().at(dw::attribute_t::type)->get<dw::die>());
             base_classes_.emplace_back(access, type);
             break;
         }
@@ -364,18 +364,18 @@ std::string struct_t::to_source() const
 
 void union_t::parse(const dw::die &die, cu_parser &parser)
 {
-    if (const auto it = die.attributes().find(dw::attribute_t::name); it != die.attributes().end()) {
-        name_ = it->get<std::string>();
+    if (die.attributes().contains(dw::attribute_t::name)) {
+        name_ = die.attributes().at(dw::attribute_t::name)->get<std::string>();
     }
-    if (const auto it = die.attributes().find(dw::attribute_t::accessibility); it != die.attributes().end()) {
-        access_ = static_cast<dw::access>(it->get<int>());
+    if (die.attributes().contains(dw::attribute_t::accessibility)) {
+        access_ = static_cast<dw::access>(die.attributes().at(dw::attribute_t::accessibility)->get<int>());
     }
 
     for (const auto &child : die) {
         std::unique_ptr<entry> entry;
         std::size_t decl_line = 0;
-        if (const auto it = child.attributes().find(dw::attribute_t::decl_line); it != child.attributes().end()) {
-            decl_line = it->get<std::size_t>();
+        if (child.attributes().contains(dw::attribute_t::decl_line)) {
+            decl_line = child.attributes().at(dw::attribute_t::decl_line)->get<std::size_t>();
         }
 
         switch (child.tag()) {

@@ -147,16 +147,6 @@ public:
         return *attributes_;
     }
 
-    [[nodiscard]] attribute_list::const_iterator find(attribute_t type) const
-    {
-        return attributes().find(type);
-    }
-
-    [[nodiscard]] bool contains(attribute_t type) const
-    {
-        return find(type) != attributes().end();
-    }
-
     [[nodiscard]] std::vector<std::string> src_files() const
     {
         char **srcfiles = nullptr;
@@ -182,7 +172,7 @@ public:
         os << "die: " << d.tag() << "\n";
         const auto &attributes = d.attributes();
         for (int i = 0; i < attributes.size(); i++) {
-            auto attr = attributes[i];
+            auto &attr = attributes[i];
             if (i > 0) {
                 os << "\n";
             }
@@ -204,7 +194,7 @@ inline std::unique_ptr<die> attribute::get<std::unique_ptr<die>>() const
     Dwarf_Off offset = 0;
     Dwarf_Bool is_info = 0;
     Dwarf_Error error = nullptr;
-    int res = dwarf_global_formref_b(attr_, &offset, &is_info, &error);
+    int res = dwarf_global_formref_b(handle_.get(), &offset, &is_info, &error);
     if (res != DW_DLV_OK) {
         throw other_error("dwarf_global_formref failed!");
     }
@@ -223,7 +213,7 @@ inline die attribute::get<die>() const
     Dwarf_Off offset = 0;
     Dwarf_Bool is_info = 0;
     Dwarf_Error error = nullptr;
-    int res = dwarf_global_formref_b(attr_, &offset, &is_info, &error);
+    int res = dwarf_global_formref_b(handle_.get(), &offset, &is_info, &error);
     if (res != DW_DLV_OK) {
         throw other_error("dwarf_global_formref failed!");
     }

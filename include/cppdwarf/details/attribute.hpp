@@ -8,33 +8,21 @@
 namespace cppdwarf {
 
 class attribute {
+    using handle_t = std::unique_ptr<Dwarf_Attribute_s, decltype(&dwarf_dealloc_attribute)>;
+
 public:
-    explicit attribute(Dwarf_Debug dbg, Dwarf_Attribute attr) : dbg_(dbg), attr_(attr) {}
+    explicit attribute(Dwarf_Debug dbg, Dwarf_Attribute attr) : dbg_(dbg), handle_(attr, &dwarf_dealloc_attribute) {}
 
     attribute(const attribute &) = delete;
     attribute &operator=(const attribute &) = delete;
-
-    attribute(attribute &&other) noexcept : dbg_(other.dbg_), attr_(other.attr_)
-    {
-        other.attr_ = nullptr;
-    }
-
-    attribute &operator=(attribute &&other) noexcept
-    {
-        if (this != &other) {
-            dbg_ = other.dbg_;
-            attr_ = other.attr_;
-            other.attr_ = nullptr;
-        }
-        return *this;
-    }
-
+    attribute(attribute &&other) = default;
+    attribute &operator=(attribute &&other) = default;
     ~attribute() = default;
 
     [[nodiscard]] const char *name() const
     {
         int res = 0;
-        Dwarf_Half attrnum = static_cast<Dwarf_Half>(type());
+        auto attrnum = static_cast<Dwarf_Half>(type());
         const char *attrname = nullptr;
         res = dwarf_get_AT_name(attrnum, &attrname);
         if (res != DW_DLV_OK) {
@@ -47,7 +35,7 @@ public:
     {
         Dwarf_Error error = nullptr;
         Dwarf_Half attr_num = 0;
-        int res = dwarf_whatattr(attr_, &attr_num, &error);
+        int res = dwarf_whatattr(handle_.get(), &attr_num, &error);
         if (res != DW_DLV_OK) {
             throw other_error("dwarf_whatattr failed!");
         }
@@ -58,7 +46,7 @@ public:
     {
         Dwarf_Error error = nullptr;
         Dwarf_Half final_form = 0;
-        int res = dwarf_whatform(attr_, &final_form, &error);
+        int res = dwarf_whatform(handle_.get(), &final_form, &error);
         if (res != DW_DLV_OK) {
             throw other_error("dwarf_whatform failed!");
         }
@@ -100,6 +88,18 @@ public:
         return false;
     }
 
+    [[nodiscard]] bool is_boolean() const noexcept
+    {
+        switch (form()) {
+        case form::flag:
+        case form::flag_present:
+            return true;
+        default:
+            break;
+        }
+        return false;
+    }
+
     template <typename T>
     T get() const
     {
@@ -108,8 +108,8 @@ public:
     }
 
 private:
-    Dwarf_Debug dbg_ = nullptr;
-    Dwarf_Attribute attr_;
+    Dwarf_Debug dbg_;
+    handle_t handle_;
 
     [[nodiscard]] std::int64_t get_integer() const
     {
@@ -119,7 +119,7 @@ private:
         if (form() == form::sdata) {
             Dwarf_Signed value = 0;
             Dwarf_Error error = nullptr;
-            int res = dwarf_formsdata(attr_, &value, &error);
+            int res = dwarf_formsdata(handle_.get(), &value, &error);
             if (res != DW_DLV_OK) {
                 throw type_error("dwarf_formsdata failed!");
             }
@@ -128,7 +128,7 @@ private:
         else {
             Dwarf_Unsigned value = 0;
             Dwarf_Error error = nullptr;
-            int res = dwarf_formudata(attr_, &value, &error);
+            int res = dwarf_formudata(handle_.get(), &value, &error);
             if (res != DW_DLV_OK) {
                 throw type_error("dwarf_formudata failed!");
             }
@@ -142,7 +142,7 @@ template <>
 {
     char *value = nullptr;
     Dwarf_Error error = nullptr;
-    if (dwarf_formstring(attr_, &value, &error) != DW_DLV_OK) {
+    if (dwarf_formstring(handle_.get(), &value, &error) != DW_DLV_OK) {
         throw type_error("dwarf_formstring failed!");
     }
     std::string result(value);
@@ -155,7 +155,7 @@ template <>
 {
     Dwarf_Bool value = 0;
     Dwarf_Error error = nullptr;
-    if (dwarf_formflag(attr_, &value, &error) != DW_DLV_OK) {
+    if (dwarf_formflag(handle_.get(), &value, &error) != DW_DLV_OK) {
         throw type_error("dwarf_formflag failed!");
     }
     return value != 0;
@@ -184,6 +184,12 @@ inline std::ostream &operator<<(std::ostream &os, const attribute &attr)
     os << "attr: " << attr.name() << ", form: " << attr.form();
     if (attr.is_string()) {
         os << ", value: " << attr.get<std::string>();
+    }
+    else if (attr.is_integer()) {
+        os << ", value: " << attr.get<std::int64_t>();
+    }
+    else if (attr.is_boolean()) {
+        os << ", value: " << attr.get<bool>();
     }
     return os;
 }

@@ -8,8 +8,8 @@ const debug_parser::result &debug_parser::parse()
     int i = 0;
     for (auto &cu : dbg_) {
         auto &cu_die = cu.die();
-        auto name = cu_die.find(dw::attribute_t::name)->get<std::string>();
-        auto comp_dir = cu_die.find(dw::attribute_t::comp_dir)->get<std::string>();
+        auto name = cu_die.attributes().at(dw::attribute_t::name)->get<std::string>();
+        auto comp_dir = cu_die.attributes().at(dw::attribute_t::comp_dir)->get<std::string>();
         auto base_dir = posixpath::commonpath({name, comp_dir});
 
         spdlog::info("[{:<4}] parsing {}", ++i, name);
@@ -40,14 +40,14 @@ void cu_parser::parse()
     parse_children(cu_.die(), parents);
 }
 
-type_t cu_parser::get_type(const dw::die &die)
+type_t cu_parser::get_type(const dw::die &die) // NOLINT(*-no-recursion)
 {
     auto it = known_types_.find(die.offset());
     if (it == known_types_.end()) {
         std::unique_ptr<dw::die> type;
         type_t new_type;
-        if (auto attr = die.find(dw::attribute_t::type); attr != die.attributes().end()) {
-            type = attr->get<std::unique_ptr<dw::die>>();
+        if (die.attributes().contains(dw::attribute_t::type)) {
+            type = die.attributes().at(dw::attribute_t::type)->get<std::unique_ptr<dw::die>>();
             new_type = get_type(*type);
         }
 
@@ -58,12 +58,12 @@ type_t cu_parser::get_type(const dw::die &die)
                 if (child.tag() != dw::tag::subrange_type) {
                     continue;
                 }
-                if (auto attr = child.find(dw::attribute_t::count); attr != child.attributes().end()) {
-                    array_size += attr->get<int>();
+                if (child.attributes().contains(dw::attribute_t::count)) {
+                    array_size = child.attributes().at(dw::attribute_t::count)->get<int>();
                     break;
                 }
-                if (auto attr = child.find(dw::attribute_t::upper_bound); attr != child.attributes().end()) {
-                    array_size += attr->get<int>() + 1;
+                if (child.attributes().contains(dw::attribute_t::upper_bound)) {
+                    array_size = child.attributes().at(dw::attribute_t::upper_bound)->get<int>() + 1;
                     break;
                 }
             }
@@ -95,7 +95,7 @@ type_t cu_parser::get_type(const dw::die &die)
             break;
         }
         case dw::tag::ptr_to_member_type: {
-            auto containing_type = die.attributes().at(dw::attribute_t::containing_type).get<dw::die>();
+            auto containing_type = die.attributes().at(dw::attribute_t::containing_type)->get<dw::die>();
             new_type.prefixes.emplace_back(" " + get_type(containing_type).describe("") + "::" + "*");
             break;
         }
@@ -123,8 +123,8 @@ void cu_parser::parse_types(const dw::die &die, namespace_list &parents) // NOLI
 
         const auto tag = child.tag();
         std::string name;
-        if (auto it = child.find(dw::attribute_t::name); it != child.attributes().end()) {
-            name = it->get<std::string>();
+        if (child.attributes().contains(dw::attribute_t::name)) {
+            name = child.attributes().at(dw::attribute_t::name)->get<std::string>();
         }
 
         switch (tag) {
@@ -188,8 +188,8 @@ void cu_parser::parse_children(const dw::die &die, namespace_list &namespaces) /
         const auto tag = child.tag();
 
         std::string name;
-        if (auto it = child.find(dw::attribute_t::name); it != child.attributes().end()) {
-            name = it->get<std::string>();
+        if (child.attributes().contains(dw::attribute_t::name)) {
+            name = child.attributes().at(dw::attribute_t::name)->get<std::string>();
         }
 
         if (tag == dw::tag::namespace_) {
@@ -206,15 +206,15 @@ void cu_parser::parse_children(const dw::die &die, namespace_list &namespaces) /
 
         std::string decl_file;
         int decl_line = 0;
-        if (auto it = child.find(dw::attribute_t::decl_file); it != child.attributes().end()) {
-            int file_index = it->get<int>();
+        if (child.attributes().contains(dw::attribute_t::decl_file)) {
+            int file_index = child.attributes().at(dw::attribute_t::decl_file)->get<int>();
             if (cu_.version() < 5) {
                 file_index -= 1;
             }
             decl_file = src_files_.at(file_index);
         }
-        if (auto it = child.find(dw::attribute_t::decl_line); it != child.attributes().end()) {
-            decl_line = it->get<int>();
+        if (child.attributes().contains(dw::attribute_t::decl_line)) {
+            decl_line = child.attributes().at(dw::attribute_t::decl_line)->get<int>();
         }
 
         if (name.empty() || decl_file.empty() || decl_line <= 0) {
