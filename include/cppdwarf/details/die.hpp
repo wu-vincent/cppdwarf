@@ -38,6 +38,17 @@ public:
         return offset;
     }
 
+    [[nodiscard]] std::size_t cu_offset() const
+    {
+        Dwarf_Off offset = 0;
+        Dwarf_Error error = nullptr;
+        int res = dwarf_die_CU_offset(handle_.get(), &offset, &error);
+        if (res != DW_DLV_OK) {
+            throw other_error("dwarf_die_CU_offset failed!");
+        }
+        return offset;
+    }
+
     [[nodiscard]] bool is_info() const
     {
         return is_info_;
