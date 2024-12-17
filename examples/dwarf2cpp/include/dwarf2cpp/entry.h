@@ -4,6 +4,7 @@
 #include <optional>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 
 #include <cppdwarf/cppdwarf.hpp>
 
@@ -115,7 +116,7 @@ public:
 
 private:
     std::string name_;
-    type_t type_;
+    std::variant<type_t, std::unique_ptr<entry>> type_;
     std::optional<dw::access> access_;
 };
 

@@ -100,7 +100,7 @@ type_t cu_parser::get_type(const dw::die &die) // NOLINT(*-no-recursion)
         }
         case dw::tag::ptr_to_member_type: {
             auto containing_type = die.attributes().at(dw::attribute_t::containing_type)->get<dw::die>();
-            new_type.type = get_type(containing_type).describe("") + "::" + "*";
+            new_type.after_type.emplace_back(get_type(containing_type).describe("") + "::" + "*");
             break;
         }
         case dw::tag::subroutine_type: {

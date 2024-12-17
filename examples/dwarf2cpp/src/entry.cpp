@@ -126,7 +126,7 @@ std::string function_t::to_source() const
         ss << "virtual ";
     }
     if (!linkage_name_.empty() && !starts_with(name_, "operator ")) {
-        ss << return_type_.describe("");
+        ss << return_type_.describe("") << " ";
     }
     if (is_explicit_) {
         ss << "explicit ";
@@ -209,18 +209,61 @@ void typedef_t::parse(const dw::die &die, cu_parser &parser)
     }
     if (die.attributes().contains(dw::attribute_t::type)) {
         const auto type = die.attributes().at(dw::attribute_t::type)->get<dw::die>();
-        type_ = parser.get_type(type);
+        if (type.attributes().contains(dw::attribute_t::name)) {
+            type_ = parser.get_type(type);
+        }
+        else {
+            std::unique_ptr<entry> entry;
+            switch (type.tag()) {
+            case dw::tag::union_type:
+                entry = std::make_unique<union_t>();
+                break;
+            case dw::tag::structure_type:
+                entry = std::make_unique<struct_t>(false);
+                break;
+            case dw::tag::class_type:
+                entry = std::make_unique<struct_t>(true);
+                break;
+            case dw::tag::enumeration_type:
+                entry = std::make_unique<enum_t>();
+                break;
+            default:
+                break;
+            }
+            if (entry) {
+                entry->parse(type, parser);
+                type_ = std::move(entry);
+            }
+            else {
+                type_ = parser.get_type(type);
+            }
+        }
     }
     if (die.attributes().contains(dw::attribute_t::accessibility)) {
         access_ = static_cast<dw::access>(die.attributes().at(dw::attribute_t::accessibility)->get<int>());
     }
-
-    // TODO: handle anonymous struct here
 }
 
 std::string typedef_t::to_source() const
 {
-    return "using " + name_ + " = " + type_.describe("") + ";";
+    return std::visit(
+        [&](auto &&type) {
+            using T = std::decay_t<decltype(type)>;
+            if constexpr (std::is_same_v<T, type_t>) {
+                return "using " + name_ + " = " + type.describe("") + ";";
+            }
+            else if constexpr (std::is_same_v<T, std::unique_ptr<entry>>) {
+                std::string type_source = type->to_source();
+                if (type_source.back() == ';') {
+                    type_source.pop_back();
+                }
+                return "typedef " + type_source + " " + name_ + ";";
+            }
+            else {
+                static_assert(false, "non-exhaustive visitor!");
+            }
+        },
+        type_);
 }
 
 void enum_t::parse(const dw::die &die, cu_parser &parser)
@@ -248,7 +291,10 @@ void enum_t::parse(const dw::die &die, cu_parser &parser)
 std::string enum_t::to_source() const
 {
     std::stringstream ss;
-    ss << "enum class " << name_;
+    ss << "enum ";
+    if (!name_.empty()) {
+        ss << "class " << name_;
+    }
     if (!base_type_.has_value()) {
         ss << " : " << base_type_.value().describe("");
     }
@@ -361,8 +407,9 @@ std::string struct_t::to_source() const
             }
         }
     }
-    ss << "};\n";
+    ss << "};";
     if (!name_.empty() && byte_size.has_value()) {
+        ss << "\n";
         ss << "static_assert(sizeof(" << name_ << ") == " << byte_size.value() << ");\n";
     }
     return ss.str();
@@ -428,6 +475,6 @@ std::string union_t::to_source() const
             ss << "    " << line << "\n";
         }
     }
-    ss << "};\n";
+    ss << "};";
     return ss.str();
 }
