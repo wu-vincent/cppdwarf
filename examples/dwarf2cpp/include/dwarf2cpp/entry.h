@@ -24,10 +24,21 @@ class entry {
 public:
     using namespace_list = std::vector<std::string>;
 
+    enum class kind_t {
+        parameter,
+        function,
+        field,
+        typedef_,
+        enum_,
+        struct_,
+        union_,
+    };
+
     explicit entry(namespace_list namespaces = {}) : namespaces_(std::move(namespaces)){};
 
     virtual ~entry() = default;
     virtual void parse(const dw::die &die, cu_parser &parser) = 0;
+    [[nodiscard]] virtual kind_t kind() const = 0;
     [[nodiscard]] virtual std::string to_source() const = 0;
     [[nodiscard]] virtual std::optional<dw::access> access() const
     {
@@ -47,8 +58,11 @@ class parameter_t : public entry {
 public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] kind_t kind() const override
+    {
+        return kind_t::parameter;
+    }
     [[nodiscard]] std::string to_source() const override;
-
     [[nodiscard]] bool is_artificial() const
     {
         return is_artificial_;
@@ -67,6 +81,10 @@ public:
     {
     }
     void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] kind_t kind() const override
+    {
+        return kind_t::function;
+    }
     [[nodiscard]] std::string to_source() const override;
     [[nodiscard]] std::optional<dw::access> access() const override
     {
@@ -89,6 +107,10 @@ class field_t : public entry {
 public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] kind_t kind() const override
+    {
+        return kind_t::field;
+    }
     [[nodiscard]] std::string to_source() const override;
     [[nodiscard]] std::optional<dw::access> access() const override
     {
@@ -97,7 +119,7 @@ public:
 
 private:
     std::string name_;
-    type_t type_;
+    std::variant<type_t, std::unique_ptr<entry>> type_;
     std::optional<std::size_t> member_location_;
     std::optional<dw::access> access_;
     bool is_static{false};
@@ -108,6 +130,10 @@ class typedef_t : public entry {
 public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]]kind_t kind() const override
+    {
+        return kind_t::typedef_;
+    }
     [[nodiscard]] std::string to_source() const override;
     [[nodiscard]] std::optional<dw::access> access() const override
     {
@@ -128,6 +154,10 @@ public:
     };
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] kind_t kind() const override
+    {
+        return kind_t::enum_;
+    }
     [[nodiscard]] std::string to_source() const override;
     [[nodiscard]] std::optional<dw::access> access() const override
     {
@@ -147,6 +177,10 @@ public:
     {
     }
     void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] kind_t kind() const override
+    {
+        return kind_t::struct_;
+    }
     [[nodiscard]] std::string to_source() const override;
     [[nodiscard]] std::optional<dw::access> access() const override
     {
@@ -166,6 +200,10 @@ class union_t : public entry {
 public:
     using entry::entry;
     void parse(const dw::die &die, cu_parser &parser) override;
+    [[nodiscard]] kind_t kind() const override
+    {
+        return kind_t::union_;
+    }
     [[nodiscard]] std::string to_source() const override;
     [[nodiscard]] std::optional<dw::access> access() const override
     {
@@ -174,6 +212,6 @@ public:
 
 private:
     std::string name_;
-    std::map<std::size_t, std::unique_ptr<entry>> members_;
+    std::map<std::size_t, std::vector<std::unique_ptr<entry>>> members_;
     std::optional<dw::access> access_;
 };

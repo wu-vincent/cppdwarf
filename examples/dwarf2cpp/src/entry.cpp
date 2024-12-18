@@ -155,7 +155,36 @@ void field_t::parse(const dw::die &die, cu_parser &parser)
         name_ = die.attributes().at(dw::attribute_t::name)->get<std::string>();
     }
     if (die.attributes().contains(dw::attribute_t::type)) {
-        type_ = parser.get_type(die.attributes().at(dw::attribute_t::type)->get<dw::die>());
+        const auto type = die.attributes().at(dw::attribute_t::type)->get<dw::die>();
+        if (type.attributes().contains(dw::attribute_t::name)) {
+            type_ = parser.get_type(type);
+        }
+        else {
+            std::unique_ptr<entry> entry;
+            switch (type.tag()) {
+            case dw::tag::union_type:
+                entry = std::make_unique<union_t>();
+                break;
+            case dw::tag::structure_type:
+                entry = std::make_unique<struct_t>(false);
+                break;
+            case dw::tag::class_type:
+                entry = std::make_unique<struct_t>(true);
+                break;
+            case dw::tag::enumeration_type:
+                entry = std::make_unique<enum_t>();
+                break;
+            default:
+                break;
+            }
+            if (entry) {
+                entry->parse(type, parser);
+                type_ = std::move(entry);
+            }
+            else {
+                type_ = parser.get_type(type);
+            }
+        }
     }
     if (die.attributes().contains(dw::attribute_t::data_member_location)) {
         member_location_ = die.attributes().at(dw::attribute_t::data_member_location)->get<std::size_t>();
@@ -169,7 +198,6 @@ void field_t::parse(const dw::die &die, cu_parser &parser)
     if (die.attributes().contains(dw::attribute_t::const_value)) {
         default_value_ = die.attributes().at(dw::attribute_t::const_value)->get<std::int64_t>();
     }
-    // TODO: handle anonymous struct here
 }
 
 std::string field_t::to_source() const
@@ -178,24 +206,42 @@ std::string field_t::to_source() const
     if (is_static) {
         ss << "static ";
     }
-    ss << type_.describe(name_) << " ";
-    if (default_value_.has_value()) {
-        ss << " = ";
-        if (type_.type == "float") {
-            auto value = static_cast<std::int32_t>(default_value_.value());
-            constexpr auto max_precision{std::numeric_limits<float>::digits10 + 1};
-            ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<float *>(&value);
-        }
-        else if (type_.type == "double") {
-            auto value = default_value_.value();
-            constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
-            ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);
-        }
-        else {
-            ss << default_value_.value();
-        }
-    }
-    ss << ";";
+    std::visit(
+        [&](auto &&type) {
+            using T = std::decay_t<decltype(type)>;
+            if constexpr (std::is_same_v<T, type_t>) {
+                ss << type.describe(name_) << " ";
+                if (default_value_.has_value()) {
+                    ss << " = ";
+                    if (type.type == "float") {
+                        auto value = static_cast<std::int32_t>(default_value_.value());
+                        constexpr auto max_precision{std::numeric_limits<float>::digits10 + 1};
+                        ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<float *>(&value);
+                    }
+                    else if (type.type == "double") {
+                        auto value = default_value_.value();
+                        constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
+                        ss << std::fixed << std::setprecision(max_precision) << *reinterpret_cast<double *>(&value);
+                    }
+                    else {
+                        ss << default_value_.value();
+                    }
+                }
+                ss << ";";
+            }
+            else if constexpr (std::is_same_v<T, std::unique_ptr<entry>>) {
+                std::string type_source = type->to_source();
+                if (type_source.back() == ';') {
+                    type_source.pop_back();
+                }
+                ss << type_source << " " << name_ << ";";
+            }
+            else {
+                static_assert(false, "non-exhaustive visitor!");
+            }
+        },
+        type_);
+
     if (member_location_.has_value()) {
         ss << " // +" << member_location_.value();
     }
@@ -390,7 +436,7 @@ std::string struct_t::to_source() const
 
     auto last_access = default_access;
     for (const auto &[decl_line, member] : members_) {
-        for (auto &m : member) {
+        for (const auto &m : member) {
             auto current_access = m->access().value_or(default_access);
             if (current_access != last_access) {
                 ss << to_string(current_access) << ":\n";
@@ -458,7 +504,7 @@ void union_t::parse(const dw::die &die, cu_parser &parser)
         }
         if (entry) {
             entry->parse(child, parser);
-            members_[decl_line] = std::move(entry);
+            members_[decl_line].emplace_back(std::move(entry));
         }
     }
 }
@@ -466,13 +512,15 @@ void union_t::parse(const dw::die &die, cu_parser &parser)
 std::string union_t::to_source() const
 {
     std::stringstream ss;
-    ss << "union" << name_ << " {\n";
+    ss << "union " << name_ << " {\n";
     for (const auto &[decl_line, member] : members_) {
-        // ss << "// Line " << line << "\n";
-        std::stringstream ss2(member->to_source());
-        std::string line;
-        while (std::getline(ss2, line)) {
-            ss << "    " << line << "\n";
+        for (const auto &m : member) {
+            // ss << "// Line " << line << "\n";
+            std::stringstream ss2(m->to_source());
+            std::string line;
+            while (std::getline(ss2, line)) {
+                ss << "    " << line << "\n";
+            }
         }
     }
     ss << "};";
